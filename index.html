@@ -18,23 +18,34 @@
       <div class="slider-row">
         <label style="width:auto;white-space:nowrap;">Default</label>
         <select id="default-img" style="flex:1;min-width:0;">
+          <option value="images/IMG_6006.jpg" selected>IMG_6006</option>
           <option value="images/complex_pattern.png">Complex pattern</option>
           <option value="images/flag_quarters.png">Quarters flag</option>
           <option value="images/gradient_radial.png">Radial gradient</option>
           <option value="images/checkerboard.png">Checkerboard</option>
         </select>
       </div>
+      <div class="slider-row">
+        <label for="img-scale" style="width:auto;white-space:nowrap;">Scale</label>
+        <input type="range" id="img-scale" min="0.05" max="1" step="0.05" value="0.25" style="flex:1;min-width:0;">
+        <input type="number" id="img-scale-num" min="0.05" max="1" step="0.05" value="0.25" style="width:4.5em;">
+      </div>
+      <div id="img-info"></div>
+      <div id="img-scale-warn" class="hidden"></div>
       <label class="file-btn" for="img-upload">Upload / Take Photo</label>
       <input type="file" id="img-upload" accept="image/*">
     </fieldset>
 
     <fieldset>
       <legend>Sampling</legend>
-      <select id="point-method">
-        <option value="grid">Regular grid</option>
-        <option value="random" selected>Random</option>
-        <option value="user">User-selected</option>
-      </select>
+      <div class="slider-row">
+        <label for="point-method" style="width:auto;white-space:nowrap;">Method</label>
+        <select id="point-method" style="flex:1;min-width:0;">
+          <option value="grid">Regular grid</option>
+          <option value="random" selected>Random</option>
+          <option value="user">User-selected</option>
+        </select>
+      </div>
 
       <div id="grid-panel" class="method-panel hidden">
         <label>Width <input type="number" id="grid-w" value="5" min="1" max="30"></label>
@@ -58,6 +69,10 @@
         <button id="gen-pts-btn" style="flex:1;margin-top:0;">Generate points</button>
         <button id="clear-pts" style="margin-top:0;background:#933;">Clear</button>
       </div>
+      <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:0.9em;cursor:pointer;">
+        <input type="checkbox" id="show-points" checked>
+        Show points
+      </label>
     </fieldset>
 
     <fieldset>

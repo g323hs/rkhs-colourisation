@@ -14,6 +14,41 @@ const state = {
   originalImg: null,
 };
 
+let recommendedScale = 0.25;
+
+const TARGET_PIXELS = 160000;
+
+function computeRecommendedScale(origW, origH) {
+  const origPixels = origW * origH;
+  if (origPixels <= TARGET_PIXELS) return 1.0;
+  const raw = Math.sqrt(TARGET_PIXELS / origPixels);
+  return Math.max(0.05, Math.min(1.0, Math.round(raw / 0.05) * 0.05));
+}
+
+function updateImgInfo() {
+  const infoEl = document.getElementById('img-info');
+  const warnEl = document.getElementById('img-scale-warn');
+  if (!state.originalImg) { infoEl.innerHTML = ''; warnEl.classList.add('hidden'); return; }
+
+  const oW = state.originalImg.naturalWidth;
+  const oH = state.originalImg.naturalHeight;
+  const scale = parseFloat(document.getElementById('img-scale').value) || 1;
+  const sW = Math.max(1, Math.round(oW * scale));
+  const sH = Math.max(1, Math.round(oH * scale));
+  const fmt = n => n.toLocaleString();
+
+  infoEl.innerHTML =
+    `<span>Original: ${oW} &times; ${oH} = ${fmt(oW * oH)} px</span>` +
+    `<span>Scaled &nbsp;: ${sW} &times; ${sH} = ${fmt(sW * sH)} px</span>`;
+
+  if (Math.abs(scale - recommendedScale) > 0.001) {
+    warnEl.textContent = `⚠ Recommended scale: ${recommendedScale}`;
+    warnEl.classList.remove('hidden');
+  } else {
+    warnEl.classList.add('hidden');
+  }
+}
+
 // ── Results state ─────────────────────────────────────────────────────────────
 
 const results = [];
@@ -45,22 +80,25 @@ function draw() {
     return;
   }
 
-  loadPixels();
+  const idata = new ImageData(state.W, state.H);
   for (let i = 0; i < state.W * state.H; i++) {
-    const g    = state.greyFlat[i];
-    const base = i * 4;
-    pixels[base]     = g;
-    pixels[base + 1] = g;
-    pixels[base + 2] = g;
-    pixels[base + 3] = 255;
+    const g = state.greyFlat[i];
+    idata.data[i * 4]     = g;
+    idata.data[i * 4 + 1] = g;
+    idata.data[i * 4 + 2] = g;
+    idata.data[i * 4 + 3] = 255;
   }
-  updatePixels();
+  drawingContext.putImageData(idata, 0, 0);
 
+  const displayW = (state.p5cnv && state.p5cnv.elt.clientWidth) || width;
+  const px = width / displayW;
+  const showPts = document.getElementById('show-points').checked;
   for (const pt of state.points) {
-    strokeWeight(1.2); stroke(0); fill(pt.r, pt.g, pt.b);
-    ellipse(pt.x, pt.y, 14, 14);
-    strokeWeight(0.5); stroke(255); fill(pt.r, pt.g, pt.b);
-    ellipse(pt.x, pt.y, 10, 10);
+    if (!showPts) break;
+    strokeWeight(1.2 * px); stroke(0); fill(pt.r, pt.g, pt.b);
+    ellipse(pt.x, pt.y, 7 * px, 7 * px);
+    strokeWeight(0.5 * px); stroke(255); fill(pt.r, pt.g, pt.b);
+    ellipse(pt.x, pt.y, 5 * px, 5 * px);
   }
 
   if (state.method === 'user') {
@@ -99,13 +137,14 @@ function mouseClicked() {
 // ── Image loading ─────────────────────────────────────────────────────────────
 
 function applyScale(img) {
-  const W = img.naturalWidth;
-  const H = img.naturalHeight;
+  const scale = parseFloat(document.getElementById('img-scale').value) || 1;
+  const W = Math.max(1, Math.round(img.naturalWidth  * scale));
+  const H = Math.max(1, Math.round(img.naturalHeight * scale));
 
   const oc  = document.createElement('canvas');
   oc.width  = W; oc.height = H;
   const ctx = oc.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = true;
   ctx.drawImage(img, 0, 0, W, H);
   const idata = ctx.getImageData(0, 0, W, H);
 
@@ -121,10 +160,10 @@ function applyScale(img) {
 
   resizeCanvas(W, H);
   if (state.p5cnv) {
-    state.p5cnv.style('width', 'auto');
-    state.p5cnv.style('height', 'auto');
-    state.p5cnv.style('max-width', '100%');
-    state.p5cnv.style('max-height', '320px');
+    state.p5cnv.style('width', '100%');
+    state.p5cnv.style('height', '100%');
+    state.p5cnv.style('max-width', '');
+    state.p5cnv.style('max-height', '');
   }
   state.points = [];
   document.getElementById('metric-frob').textContent = '—';
@@ -139,15 +178,24 @@ function applyScale(img) {
   canvC.getContext('2d').clearRect(0, 0, W, H);
 
   setStatus(`${W}×${H} px`);
+  updateImgInfo();
   redraw();
+}
+
+function loadImageAndAutoScale(img) {
+  recommendedScale = computeRecommendedScale(img.naturalWidth, img.naturalHeight);
+  const sl = document.getElementById('img-scale');
+  const nm = document.getElementById('img-scale-num');
+  if (sl) { sl.value = recommendedScale; nm.value = recommendedScale; }
+  state.originalImg = img;
+  applyScale(img);
 }
 
 function loadImageFromFile(file) {
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
-    state.originalImg = img;
-    applyScale(img);
+    loadImageAndAutoScale(img);
     URL.revokeObjectURL(url);
   };
   img.src = url;
@@ -189,8 +237,6 @@ function selectResult(id) {
   document.querySelectorAll('#results-tbody tr').forEach(tr => {
     tr.classList.toggle('selected-row', parseInt(tr.dataset.rid) === id);
   });
-  const row = document.querySelector(`#results-tbody tr[data-rid="${id}"]`);
-  if (row) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   renderCharts();
 }
 
@@ -215,10 +261,10 @@ function loadResult(id) {
 
   resizeCanvas(r.W, r.H);
   if (state.p5cnv) {
-    state.p5cnv.style('width', 'auto');
-    state.p5cnv.style('height', 'auto');
-    state.p5cnv.style('max-width', '100%');
-    state.p5cnv.style('max-height', '320px');
+    state.p5cnv.style('width', '100%');
+    state.p5cnv.style('height', '100%');
+    state.p5cnv.style('max-width', '');
+    state.p5cnv.style('max-height', '');
   }
 
   const canvA = document.getElementById('canvas-a');
@@ -341,10 +387,17 @@ function addResult(r) {
 // ── UI wiring ─────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-  syncSliderNum('sigma1',  'sigma1-num');
-  syncSliderNum('sigma2',  'sigma2-num');
-  syncSliderNum('p-param', 'p-num');
-  syncSliderNum('delta',   'delta-num');
+  syncSliderNum('sigma1',    'sigma1-num');
+  syncSliderNum('sigma2',    'sigma2-num');
+  syncSliderNum('p-param',   'p-num');
+  syncSliderNum('delta',     'delta-num');
+  syncSliderNum('img-scale', 'img-scale-num');
+
+  document.getElementById('img-scale').addEventListener('input', updateImgInfo);
+  document.getElementById('img-scale-num').addEventListener('input', updateImgInfo);
+  document.getElementById('img-scale').addEventListener('change', () => {
+    if (state.originalImg) { state.points = []; applyScale(state.originalImg); }
+  });
 
   renderTable(); // populate headers immediately
 
@@ -371,7 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .then(blob => {
         const url = URL.createObjectURL(blob);
         const img = new Image();
-        img.onload = () => { state.originalImg = img; applyScale(img); };
+        img.onload = () => { loadImageAndAutoScale(img); };
         img.src = url;
       })
       .catch(() => {});
@@ -420,6 +473,8 @@ document.addEventListener('DOMContentLoaded', () => {
     state.points = [];
     redraw();
   });
+
+  document.getElementById('show-points').addEventListener('change', () => redraw());
 
   document.getElementById('gen-pts-btn').addEventListener('click', () => {
     if (!state.colourFlat) { setStatus('Upload an image first.'); return; }
