@@ -200,11 +200,20 @@ input[type=file] { display: none; }
 
 /* p5 canvas wrapper inside img-box */
 #canvas-b-wrap {
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+#canvas-b-dots {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 #canvas-b-wrap canvas {
@@ -269,9 +278,8 @@ input[type=file] { display: none; }
 }
 
 #results-table-wrap {
-  flex: 1;
+  flex: 0 0 auto;
   overflow-x: auto;
-  min-width: 0;
 }
 
 #results-table {
@@ -308,8 +316,8 @@ input[type=file] { display: none; }
 }
 
 #results-charts {
-  width: 260px;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 260px;
   display: flex;
   flex-direction: column;
   gap: 16px;

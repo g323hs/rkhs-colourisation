@@ -90,30 +90,105 @@ function draw() {
   }
   drawingContext.putImageData(idata, 0, 0);
 
-  const displayW = (state.p5cnv && state.p5cnv.elt.clientWidth) || width;
-  const px = width / displayW;
-  const showPts = document.getElementById('show-points').checked;
-  for (const pt of state.points) {
-    if (!showPts) break;
-    strokeWeight(1.2 * px); stroke(0); fill(pt.r, pt.g, pt.b);
-    ellipse(pt.x, pt.y, 7 * px, 7 * px);
-    strokeWeight(0.5 * px); stroke(255); fill(pt.r, pt.g, pt.b);
-    ellipse(pt.x, pt.y, 5 * px, 5 * px);
+  drawDots();
+}
+
+function drawDots() {
+  const dotCnv = document.getElementById('canvas-b-dots');
+  const dpr    = window.devicePixelRatio || 1;
+  const boxW   = dotCnv.clientWidth  || 0;
+  const boxH   = dotCnv.clientHeight || 0;
+  if (!boxW || !boxH) return;
+
+  const needW = Math.round(boxW * dpr);
+  const needH = Math.round(boxH * dpr);
+  if (dotCnv.width !== needW || dotCnv.height !== needH) {
+    dotCnv.width  = needW;
+    dotCnv.height = needH;
   }
 
-  if (state.method === 'user') {
-    noFill(); strokeWeight(3);
-    stroke(state.tool === 'pick' ? color(0, 180, 0) : color(200, 0, 0));
-    rect(2, 2, width - 4, height - 4);
+  const ctx = dotCnv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, boxW, boxH);
+
+  // Compute where the greyscale image is rendered within the overlay box
+  // (mirrors CSS object-fit: contain on the p5 canvas)
+  const imgAspect = state.W / state.H;
+  const boxAspect = boxW / boxH;
+  let renderW, renderH, ox, oy;
+  if (imgAspect >= boxAspect) {
+    renderW = boxW; renderH = boxW / imgAspect;
+    ox = 0; oy = (boxH - renderH) / 2;
+  } else {
+    renderH = boxH; renderW = boxH * imgAspect;
+    ox = (boxW - renderW) / 2; oy = 0;
   }
+
+  // User-mode selection border
+  if (state.method === 'user') {
+    ctx.strokeStyle = state.tool === 'pick' ? '#00b400' : '#c80000';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(ox + 2, oy + 2, renderW - 4, renderH - 4);
+  }
+
+  const showPts = document.getElementById('show-points').checked;
+  if (!state.greyFlat || !showPts) return;
+
+  const scaleX = renderW / state.W;
+  const scaleY = renderH / state.H;
+  const R = 3.5; // dot radius in display pixels
+
+  for (const pt of state.points) {
+    const x = ox + pt.x * scaleX;
+    const y = oy + pt.y * scaleY;
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI * 2);
+    ctx.fillStyle = `rgb(${pt.r},${pt.g},${pt.b})`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+    ctx.lineWidth = 1.2;
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
+function mouseToImageCoords() {
+  const el   = state.p5cnv && state.p5cnv.elt;
+  if (!el) return null;
+  const boxW = el.clientWidth  || width;
+  const boxH = el.clientHeight || height;
+
+  // Convert p5 canvas logical coords → CSS pixel position within element
+  const cssX = mouseX * boxW / state.W;
+  const cssY = mouseY * boxH / state.H;
+
+  // Compute object-fit: contain rendered image rect (mirrors drawDots)
+  const imgAspect = state.W / state.H;
+  const boxAspect = boxW / boxH;
+  let renderW, renderH, ox, oy;
+  if (imgAspect >= boxAspect) {
+    renderW = boxW; renderH = boxW / imgAspect;
+    ox = 0; oy = (boxH - renderH) / 2;
+  } else {
+    renderH = boxH; renderW = boxH * imgAspect;
+    ox = (boxW - renderW) / 2; oy = 0;
+  }
+
+  // Reject clicks outside the rendered image area
+  if (cssX < ox || cssX > ox + renderW || cssY < oy || cssY > oy + renderH) return null;
+
+  return {
+    x: Math.floor((cssX - ox) * state.W / renderW),
+    y: Math.floor((cssY - oy) * state.H / renderH),
+  };
 }
 
 function mouseClicked() {
   if (state.method !== 'user' || !state.greyFlat) return;
-  if (mouseX < 0 || mouseX >= width || mouseY < 0 || mouseY >= height) return;
+  const pos = mouseToImageCoords();
+  if (!pos) return;
 
-  const mx = Math.floor(mouseX);
-  const my = Math.floor(mouseY);
+  const mx = Math.max(0, Math.min(state.W - 1, pos.x));
+  const my = Math.max(0, Math.min(state.H - 1, pos.y));
 
   if (state.tool === 'pick') {
     const base = (my * state.W + mx) * 4;
