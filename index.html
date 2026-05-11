@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RKHS Image Colourisation</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <h1>RKHS Image Colourisation</h1>
+
+  <div id="controls">
+
+    <fieldset>
+      <legend>Image</legend>
+      <div class="slider-row">
+        <label style="width:auto;white-space:nowrap;">Default</label>
+        <select id="default-img" style="flex:1;min-width:0;">
+          <option value="images/complex_pattern.png">Complex pattern</option>
+          <option value="images/flag_quarters.png">Quarters flag</option>
+          <option value="images/gradient_radial.png">Radial gradient</option>
+          <option value="images/checkerboard.png">Checkerboard</option>
+        </select>
+      </div>
+      <label class="file-btn" for="img-upload">Upload / Take Photo</label>
+      <input type="file" id="img-upload" accept="image/*">
+    </fieldset>
+
+    <fieldset>
+      <legend>Sampling</legend>
+      <select id="point-method">
+        <option value="grid">Regular grid</option>
+        <option value="random" selected>Random</option>
+        <option value="user">User-selected</option>
+      </select>
+
+      <div id="grid-panel" class="method-panel hidden">
+        <label>Width <input type="number" id="grid-w" value="5" min="1" max="30"></label>
+        <label>Height <input type="number" id="grid-h" value="5" min="1" max="30"></label>
+      </div>
+
+      <div id="random-panel" class="method-panel">
+        <label>Points <input type="number" id="n-random" value="200" min="1" max="500"></label>
+        <label>
+          <input type="checkbox" id="use-seed" checked>
+          Seed <input type="number" id="seed" value="42" min="0">
+        </label>
+      </div>
+
+      <div id="user-panel" class="method-panel hidden">
+        <button id="tool-pick" class="tool-btn active">Pick</button>
+        <button id="tool-remove" class="tool-btn">Remove</button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button id="gen-pts-btn" style="flex:1;margin-top:0;">Generate points</button>
+        <button id="clear-pts" style="margin-top:0;background:#933;">Clear</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Kernel parameters</legend>
+      <div class="param-row">
+        <label style="width:auto;white-space:nowrap;">Kernel</label>
+        <select id="kernel-type" style="flex:1;min-width:0;margin:0;padding:3px 6px;font-size:0.88em;">
+          <option value="gaussian">Gaussian</option>
+          <option value="wendland">Wendland C2</option>
+        </select>
+      </div>
+      <div class="param-row">
+        <label>&#963;&#8321;</label>
+        <input type="range" id="sigma1" min="0.1" max="200" step="0.1" value="0.1">
+        <input type="number" id="sigma1-num" value="0.1" min="0.1" max="200" step="0.1">
+      </div>
+      <div class="param-row">
+        <label>&#963;&#8322;</label>
+        <input type="range" id="sigma2" min="0.1" max="200" step="0.1" value="1">
+        <input type="number" id="sigma2-num" value="1" min="0.1" max="200" step="0.1">
+      </div>
+      <div class="param-row">
+        <label>p</label>
+        <input type="range" id="p-param" min="0.1" max="3" step="0.1" value="1">
+        <input type="number" id="p-num" value="1" min="0.1" max="3" step="0.1">
+      </div>
+      <div class="param-row">
+        <label>&#948;</label>
+        <input type="range" id="delta" min="0.000001" max="1" step="0.000001" value="0.1">
+        <input type="number" id="delta-num" value="0.1" min="0.000001" max="1" step="0.000001">
+      </div>
+      <button id="colourise-btn">Colourise</button>
+      <p id="status"></p>
+    </fieldset>
+
+  </div>
+
+  <div id="panels">
+    <div class="panel">
+      <div class="panel-label"><b>(a)</b> Original</div>
+      <div class="img-box"><canvas id="canvas-a"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="panel-label"><b>(b)</b> Greyscale with data points <i>D</i></div>
+      <div class="img-box"><div id="canvas-b-wrap"></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-label"><b>(c)</b> Colourised output</div>
+      <div class="img-box"><canvas id="canvas-c"></canvas></div>
+    </div>
+  </div>
+
+  <div id="metrics">
+    <div class="metric-card">
+      <div class="metric-formula">Frobenius norm</div>
+      <div class="metric-value" id="metric-frob">—</div>
+      <div class="metric-desc">smaller is better</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-formula">SSIM index</div>
+      <div class="metric-value" id="metric-ssim">—</div>
+      <div class="metric-desc">closer to 1 is better</div>
+    </div>
+  </div>
+
+  <div id="results-section">
+    <h2 id="results-heading">Results</h2>
+    <div id="results-inner">
+      <div id="results-table-wrap">
+        <table id="results-table">
+          <thead><tr></tr></thead>
+          <tbody id="results-tbody"></tbody>
+        </table>
+      </div>
+      <div id="results-charts">
+        <div class="chart-wrap">
+          <div class="chart-title">&#8214;&#183;&#8214;<sub>F</sub> &mdash; smaller is better</div>
+          <div id="chart-frob" class="chart-container"></div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">SSIM &mdash; closer to 1 is better</div>
+          <div id="chart-ssim" class="chart-container"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="colourise.js"></script>
+<script src="sketch.js"></script>
+</body>
+</html>
