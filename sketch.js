@@ -182,6 +182,10 @@ function mouseToImageCoords() {
   };
 }
 
+function windowResized() {
+  redraw();
+}
+
 function mouseClicked() {
   if (state.method !== 'user' || !state.greyFlat) return;
   const pos = mouseToImageCoords();
@@ -547,6 +551,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('clear-pts').addEventListener('click', () => {
     state.points = [];
     redraw();
+  });
+
+  document.getElementById('clear-results-btn').addEventListener('click', () => {
+    results.length = 0;
+    selectedResultId = -1;
+    renderTable();
+    renderCharts();
   });
 
   document.getElementById('show-points').addEventListener('change', () => redraw());

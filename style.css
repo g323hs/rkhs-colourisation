@@ -228,8 +228,9 @@ input[type=file] { display: none; }
 /* ── Metrics ── */
 #metrics {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 60px;
+  gap: 24px 60px;
   margin-top: 20px;
 }
 
@@ -275,15 +276,17 @@ input[type=file] { display: none; }
   display: flex;
   gap: 24px;
   align-items: flex-start;
+  min-width: 0;
 }
 
 #results-table-wrap {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
 }
 
 #results-table {
-  width: 100%;
   border-collapse: collapse;
   font-size: 0.82em;
 }
