@@ -26,15 +26,6 @@ const MASTER_DEFAULTS = Object.freeze({
   density:  3.0,      // edge/smooth density ratio
 });
 
-// Discrete steps for the ξ (density ratio) slider.
-const DENSITY_STEPS = [0.1, 0.5, 1, 2, 3, 5, 10, 50, 100];
-
-function densityValToIdx(val) {
-  let best = 0, bestDist = Infinity;
-  DENSITY_STEPS.forEach((s, i) => { const d = Math.abs(s - val); if (d < bestDist) { bestDist = d; best = i; } });
-  return best;
-}
-
 let recommendedScale = 0.25;
 // Counter for user-uploaded images; populates "UPLOAD N" labels in the
 // default-image dropdown so previous uploads stay selectable.
@@ -437,7 +428,7 @@ function syncLogSlider(sliderId, numId, fmtFn) {
 }
 
 function fmtSigma(v) {
-  return parseFloat(v.toPrecision(2)).toString();
+  return parseFloat(v.toPrecision(3)).toString();
 }
 
 function fmtDelta(v) {
@@ -494,23 +485,15 @@ function getMasterParams() {
 }
 
 function resetMasterParams() {
+  // Sliders hold percentages; only β/N/Fill are editable now.
   document.getElementById('m-beta1').value    = MASTER_DEFAULTS.beta1    * 100;
   document.getElementById('m-beta2').value    = MASTER_DEFAULTS.beta2    * 100;
   document.getElementById('m-nfrac').value    = MASTER_DEFAULTS.nFrac    * 100;
   document.getElementById('m-fillfrac').value = MASTER_DEFAULTS.fillFrac * 100;
-  document.getElementById('m-density').value        = MASTER_DEFAULTS.density;
-  document.getElementById('m-density-slider').value = densityValToIdx(MASTER_DEFAULTS.density);
+  document.getElementById('m-density').value         = MASTER_DEFAULTS.density.toFixed(1);
+  document.getElementById('m-density-slider').value  = MASTER_DEFAULTS.density;
   refreshMasterReadouts();
   updateAutoSummary();
-}
-
-function resetKernelParams() {
-  document.getElementById('kernel-type').value = 'gaussian';
-  setLogSlider('sigma1', 'sigma1-num', 0.1,  fmtSigma);
-  setLogSlider('sigma2', 'sigma2-num', 1.0,  fmtSigma);
-  document.getElementById('p-param').value = 1;
-  document.getElementById('p-num').value   = 1;
-  setLogSlider('delta',  'delta-num',  0.1,  fmtDelta);
 }
 
 // Sync each slider's numeric readout to its current value.
@@ -803,7 +786,7 @@ function addResult(r) {
   }
 
   function maybeWarn(value) {
-    if (warned || parseFloat(value) <= 1 + 1e-9) return;
+    if (warned || parseFloat(value) <= 1) return;
     warned = true;
     const backdrop = document.getElementById('p-modal-backdrop');
     backdrop.classList.remove('hidden');
@@ -825,32 +808,9 @@ document.addEventListener('DOMContentLoaded', () => {
   syncLogSlider('sigma2',  'sigma2-num', fmtSigma);
   syncSliderNum('p-param', 'p-num');
   syncLogSlider('delta',   'delta-num',  fmtDelta);
-  syncSliderNum('img-scale',       'img-scale-num');
-  syncSliderNum('n-random-slider', 'n-random');
-
-  // ξ uses discrete steps — custom bidirectional wiring.
-  (function () {
-    const sl = document.getElementById('m-density-slider');
-    const nm = document.getElementById('m-density');
-    sl.addEventListener('input', () => {
-      nm.value = DENSITY_STEPS[parseInt(sl.value)];
-      updateAutoSummary();
-    });
-    nm.addEventListener('change', () => {
-      const v = parseFloat(nm.value);
-      if (Number.isFinite(v) && v > 0) sl.value = densityValToIdx(v);
-      updateAutoSummary();
-    });
-  })();
-
-  document.getElementById('reset-kernel').addEventListener('click', resetKernelParams);
-
-  // Clamp grid W/H inputs to minimum 1.
-  ['grid-w', 'grid-h'].forEach(id => {
-    document.getElementById(id).addEventListener('change', function () {
-      if (!this.value || parseInt(this.value) < 1) this.value = 1;
-    });
-  });
+  syncSliderNum('img-scale',        'img-scale-num');
+  syncSliderNum('n-random-slider',  'n-random');
+  syncSliderNum('m-density-slider', 'm-density');
 
   document.getElementById('img-scale').addEventListener('input', updateImgInfo);
   document.getElementById('img-scale-num').addEventListener('input', updateImgInfo);

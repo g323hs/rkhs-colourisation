@@ -39,8 +39,6 @@ fieldset {
   background: #fdfdfa;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  padding: 0;
 }
 
 .algo-box { flex: 2 1 460px; }
