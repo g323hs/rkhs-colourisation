@@ -18,25 +18,407 @@ h1 {
 
 /* ── Controls ── */
 #controls {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
   align-items: stretch;
   gap: 16px;
   margin-bottom: 24px;
 }
+#controls .image-box { grid-column: 1; }
+#controls .algo-box  { grid-column: 2 / span 2; }
 
 fieldset {
-  flex: 1 1 210px;
   border: 1px solid #bbb;
   border-radius: 6px;
   padding: 14px 18px 18px;
 }
 
+/* Top-level "super" boxes — Image and Algorithm */
+.box {
+  flex: 1 1 210px;
+  background: #fdfdfa;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.algo-box { flex: 2 1 460px; }
+
+/* Algorithm box uses column flow so the shared action row at the bottom
+   stays pinned to the bottom of the super-box. */
+.algo-box {
+  display: flex;
+  flex-direction: column;
+}
+.algo-box .mode-panels-wrap { flex: 1 1 auto; }
+.algo-actions {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed #d6d6cc;
+}
+.algo-actions .action-row { margin-top: 0; }
+.algo-blurb {
+  margin: 0 0 12px;
+  font-size: 0.82em;
+  color: #555;
+  line-height: 1.45;
+}
+.algo-blurb b { color: #333; }
+
 legend {
   font-weight: bold;
   font-size: 0.88em;
-  padding: 0 6px;
+  padding: 0 8px;
   color: #444;
+}
+
+legend.box-title {
+  font-size: 1.15em;
+  font-weight: 700;
+  color: #222;
+  letter-spacing: 0.01em;
+  padding: 0 10px;
+}
+
+/* Make the .box top border a complete rectangle, then let the legend "break"
+   it like a standard fieldset: the legend's matching background covers the
+   line behind it, leaving an apparent gap on either side of the title. */
+.box {
+  border: 0;
+  position: relative;
+  padding-top: 14px;
+}
+.box::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Sub-boxes (Sampling, Kernel parameters, Master parameters) */
+.subbox {
+  border: 1px solid #cfcfc8;
+  border-radius: 5px;
+  background: #fff;
+  padding: 10px 14px 14px;
+  margin-top: 12px;
+}
+
+.subbox > legend {
+  font-size: 0.78em;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #666;
+  padding: 0 6px;
+}
+
+/* ── Mode toggle (Manual / Automatic) ─────────────────────── */
+.mode-toggle {
+  display: flex;
+  gap: 0;
+  margin-top: 8px;
+  border: 1px solid #bbb;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #ecece4;
+}
+
+.mode-btn {
+  flex: 1;
+  margin: 0;
+  padding: 8px 10px;
+  background: transparent;
+  color: #555;
+  border-radius: 0;
+  font-size: 0.88em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.mode-btn + .mode-btn { border-left: 1px solid #bbb; }
+
+.mode-btn:hover { background: #e0e0d6; color: #222; }
+
+.mode-btn.active {
+  background: #336;
+  color: #fff;
+}
+.mode-btn.active:hover { background: #224; }
+
+/* Stack both mode panels in the same grid cell so the algo box height
+   tracks the TALLER panel — switching modes no longer changes height.
+   Both panels are flex-columns that fill the cell and distribute their
+   sub-boxes so the shorter mode doesn't leave a void above the action bar. */
+.mode-panels-wrap {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.mode-panels-wrap > .mode-panel {
+  grid-row: 1;
+  grid-column: 1;
+  min-width: 0;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  height: 100%;
+}
+.mode-panels-wrap > .mode-panel.hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ── Auto mode bits ───────────────────────────────────────── */
+.auto-hint {
+  margin-top: 12px;
+  font-size: 0.84em;
+  color: #555;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+.advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  font-size: 0.88em;
+  color: #333;
+  cursor: pointer;
+  user-select: none;
+}
+.advanced-toggle input { cursor: pointer; }
+
+.master-params { transition: opacity 0.15s; }
+.master-params[disabled] {
+  opacity: 0.55;
+  background: #f7f7f2;
+}
+.master-params[disabled] input { cursor: not-allowed; }
+
+/* 2-column grid for master / kernel parameters (compact). */
+.master-params,
+.params-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  align-items: start;
+}
+.master-params > legend,
+.params-grid  > legend { grid-column: 1 / -1; }
+/* Bottom row of master parameters: ξ · Seed · Reset, aligned on a single row */
+/* Rows that should span the full width of the grid (e.g. Kernel select). */
+.master-row.full-row { grid-column: 1 / -1; }
+.master-reset-row { justify-content: flex-end; display: flex; }
+.master-reset-row .btn-reset { margin: 0; }
+
+.master-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 0;
+  min-width: 0;
+}
+
+.master-row > label {
+  font-size: 0.82em;
+  color: #333;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  line-height: 1.25;
+  font-weight: 600;
+}
+.master-row > label .hint {
+  font-size: 0.72em;
+  color: #888;
+  font-weight: normal;
+}
+
+.master-row .ctl {
+  display: grid;
+  grid-template-columns: 1fr 46px;
+  gap: 6px;
+  align-items: center;
+}
+.master-row:not(.slider-master) .ctl {
+  grid-template-columns: 1fr;
+}
+/* Kernel-row readouts need a touch more room for values like 0.000001. */
+.params-grid .master-row.slider-master .ctl {
+  grid-template-columns: 1fr 70px;
+}
+
+.master-row input[type=number] {
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  text-align: right;
+  background: #fff;
+}
+
+.master-row input[type=range] {
+  width: 100%;
+  margin: 0;
+  accent-color: #336;
+}
+
+/* Shared style for editable numeric readout inputs (master % values and kernel params). */
+.master-row .pct-out,
+.master-row .val-out {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78em;
+  text-align: right;
+  color: #2a4a7a;
+  background: #eef2f8;
+  border: 1px solid #c8d3e4;
+  border-radius: 4px;
+  padding: 3px 5px;
+  font-weight: 600;
+  width: 100%;
+  cursor: text;
+  -moz-appearance: textfield;
+  transition: border-color 0.15s, background 0.15s;
+}
+.master-row .pct-out:hover,
+.master-row .val-out:hover {
+  border-color: #8aaad4;
+  background: #e4ecf7;
+}
+.master-row .pct-out:focus,
+.master-row .val-out:focus {
+  outline: none;
+  border-color: #4a80c8;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(74,128,200,0.25);
+}
+/* Hide spinners by default; show on hover/focus so the field stays compact but remains discoverable. */
+.master-row .pct-out::-webkit-outer-spin-button,
+.master-row .pct-out::-webkit-inner-spin-button,
+.master-row .val-out::-webkit-outer-spin-button,
+.master-row .val-out::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.master-row .pct-out:hover::-webkit-outer-spin-button,
+.master-row .pct-out:focus::-webkit-outer-spin-button,
+.master-row .pct-out:hover::-webkit-inner-spin-button,
+.master-row .pct-out:focus::-webkit-inner-spin-button,
+.master-row .val-out:hover::-webkit-outer-spin-button,
+.master-row .val-out:focus::-webkit-outer-spin-button,
+.master-row .val-out:hover::-webkit-inner-spin-button,
+.master-row .val-out:focus::-webkit-inner-spin-button {
+  -webkit-appearance: inner-spin-button;
+}
+
+.master-row .ctl-select {
+  width: 100%;
+  padding: 5px 8px;
+  font-family: inherit;
+  font-size: 0.86em;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.master-params[disabled] .pct-out { opacity: 0.9; }
+
+.btn-reset {
+  margin-top: 12px;
+  background: #777;
+  font-size: 0.8em;
+  padding: 5px 10px;
+}
+.btn-reset:hover { background: #555; }
+
+.auto-summary {
+  margin-top: 14px;
+  padding: 8px 12px;
+  background: #eef2f8;
+  border: 1px solid #c8d3e4;
+  border-radius: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82em;
+  color: #2a4a7a;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  justify-content: center;
+}
+.auto-summary .k { color: #6a7a95; }
+.auto-summary .v { font-weight: bold; color: #1a2a4a; }
+.auto-summary .sep { color: #aab4c4; padding: 0 4px; }
+
+/* ── Action rows shared by both modes ─────────────────────── */
+.action-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.action-row > button { flex: 1; margin-top: 0; }
+
+.btn-primary { background: #336; }
+.btn-primary:hover { background: #224; }
+.btn-danger  { background: #933; }
+.btn-danger:hover  { background: #722; }
+.btn-go {
+  width: 100%;
+  margin-top: 10px;
+  background: #0a6;
+  font-size: 0.95em;
+  font-weight: 600;
+  padding: 9px 14px;
+}
+.btn-go:hover { background: #084; }
+
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 0.88em;
+  cursor: pointer;
+  color: #333;
+}
+
+/* "Show points" toggle pinned inline at the right of the random-panel grid.
+   Green pill when checked, red when unchecked. */
+.sampling-box { position: relative; }
+.show-points-toggle {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.82em;
+  font-weight: 600;
+  color: #fff;
+  background: #b03a2e;
+  border: 1px solid #8a2a20;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+}
+.show-points-toggle:has(input:checked) {
+  background: #2e8b57;
+  border-color: #1e6b40;
+}
+.show-points-toggle input {
+  margin: 0;
+  accent-color: #fff;
 }
 
 select {
@@ -55,11 +437,27 @@ select {
   margin-top: 0;
 }
 
+/* Stack all three method panels in the same cell so switching method
+   never changes the sampling-box height. */
+.method-panels-wrap {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin-top: 10px;
+}
+.method-panels-wrap > .method-panel {
+  grid-row: 1;
+  grid-column: 1;
+  min-width: 0;
+}
+.method-panels-wrap > .method-panel.invis {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .method-panel {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
 }
 
 .method-panel label {
@@ -77,7 +475,65 @@ select {
   font-family: inherit;
 }
 
+/* Random-sampling panel: 2-col grid so "n" (points) sits beside the Seed
+   group on the same row, both styled as parameter pills. */
+.random-panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px 28px;
+  align-items: end;
+}
+.random-panel-grid .rp-points { grid-column: 1; padding-right: 8px; }
+.random-panel-grid .rp-seed   { grid-column: 2; grid-row: 1; padding-left: 8px; }
+.random-panel-grid > .rp-show { grid-column: 3; grid-row: 1; align-self: end; }
+.random-panel-grid > .master-row.full-row { grid-column: 1 / -1; }
+.random-panel-grid .rp-seed .seed-group { gap: 10px; flex-wrap: wrap; }
+.seed-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+  flex-basis: 100%;
+}
+
+.seed-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.seed-opt input[type=radio] { margin: 0; cursor: pointer; accent-color: #336; }
+
+.seed-opt input[type=number] {
+  width: 60px;
+  padding: 3px 5px;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 0.88em;
+}
+
+/* When "Random" is chosen, fade the seed input to signal it's inactive. */
+.seed-group:has(input[value="random"]:checked) input[type=number] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .hidden { display: none !important; }
+
+/* Reserve vertical space for the recommended-scale warning so layout doesn't
+   jump when it appears/disappears. */
+#img-scale-warn {
+  min-height: 26px;
+  box-sizing: border-box;
+}
+#img-scale-warn.hidden {
+  display: flex !important;
+  visibility: hidden;
+}
 
 .slider-row, .param-row {
   display: flex;
@@ -113,6 +569,41 @@ select {
 
 #img-info span { display: block; }
 
+/* Full-resolution preview of the currently loaded image (Image box).
+   Stretches to fill the available vertical space inside the Image super-box,
+   so the preview is as tall as possible while still fitting. */
+.img-preview-wrap {
+  margin-top: 12px;
+  width: 100%;
+  flex: 1 1 200px;
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    repeating-conic-gradient(#f0efe9 0% 25%, #e6e5df 0% 50%) 50% / 12px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  overflow: hidden;
+  padding: 6px;
+}
+
+.img-preview-wrap img {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.img-preview-wrap img:not([src]),
+.img-preview-wrap img[src=""] { display: none; }
+
+/* Image super-box uses column flow so the preview can flex. */
+.image-box { display: flex; flex-direction: column; }
+.image-box.box       { /* inherit */ }
+fieldset.box.image-box { display: flex; flex-direction: column; }
+
 #img-scale-warn {
   margin-top: 5px;
   font-size: 0.78em;
@@ -121,7 +612,23 @@ select {
   border: 1px solid #d9b84a;
   border-radius: 3px;
   padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
 }
+#img-scale-warn .warn-btn {
+  margin: 0;
+  padding: 2px 8px;
+  font-size: 0.95em;
+  background: #7a4800;
+  color: #fff;
+  border-radius: 3px;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+#img-scale-warn .warn-btn:hover { background: #5a3500; }
 
 input[type=file] { display: none; }
 
@@ -144,9 +651,14 @@ input[type=file] { display: none; }
 .tool-btn { background: #555; }
 .tool-btn.active { background: #0a6; }
 #tool-remove.active { background: #c22; }
-#clear-pts { background: #933; }
-#gen-pts-btn { margin-top: 10px; }
-#colourise-btn { width: 100%; margin-top: 12px; background: #336; font-size: 0.95em; }
+
+/* "Upload / Take Photo" button placed under the image dropdown */
+.file-btn-top {
+  display: block;
+  text-align: center;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
 
 #status {
   margin-top: 8px;
@@ -157,6 +669,19 @@ input[type=file] { display: none; }
 }
 
 /* ── Panels ── */
+/* Pipeline stage toggle (in auto mode panel) */
+.pipeline-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  font-size: 0.88em;
+  color: #444;
+  cursor: pointer;
+  user-select: none;
+}
+.pipeline-toggle-label input[type=checkbox] { accent-color: #336; cursor: pointer; }
+
 #panels {
   display: flex;
   gap: 16px;
@@ -164,6 +689,18 @@ input[type=file] { display: none; }
   justify-content: center;
   align-items: flex-start;
 }
+
+/* Pipeline panels hidden until expanded */
+.pipeline-panel { display: none; }
+
+/* 2×3 expanded grid */
+#panels.pipeline-mode {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: start;
+}
+#panels.pipeline-mode .pipeline-panel { display: flex; flex-direction: column; }
+#panels.pipeline-mode .panel { flex: unset; }
 
 .panel {
   flex: 1 1 200px;
@@ -273,22 +810,37 @@ input[type=file] { display: none; }
 }
 
 #results-inner {
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
   min-width: 0;
 }
+#results-inner > #results-table-wrap { grid-column: 1; }
+#results-inner > #results-charts     { grid-column: 2 / span 2; }
 
 #results-table-wrap {
-  flex: 0 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid #e0e0db;
+  border-radius: 4px;
 }
+#results-table-wrap.scrollable {
+  max-height: 376px;
+  overflow-y: auto;
+}
+#results-table thead th { position: sticky; top: 0; z-index: 1; }
+#results-table tbody tr.blank-row { color: #ccc; pointer-events: none; }
+#results-table tbody tr.blank-row:hover { background: inherit; cursor: default; }
+#results-table tbody tr.blank-row:nth-child(even) { background: #f9f9f7; }
 
 #results-table {
   border-collapse: collapse;
   font-size: 0.82em;
+  width: 100%;
 }
 
 #results-table th {
@@ -319,8 +871,8 @@ input[type=file] { display: none; }
 }
 
 #results-charts {
-  flex: 1;
-  min-width: 260px;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -331,6 +883,7 @@ input[type=file] { display: none; }
   border: 1px solid #ddd;
   border-radius: 4px;
   padding: 8px;
+  min-height: 180px;
 }
 
 .chart-title {
@@ -341,14 +894,151 @@ input[type=file] { display: none; }
   font-family: Georgia, serif;
 }
 
-.chart-container { width: 100%; }
+.chart-container {
+  width: 100%;
+  min-height: 150px;
+}
 
 /* Mobile layout */
+/* ── Responsive layout ────────────────────────────────────────────────
+   The page has three layered grids: #controls (image | algorithm), the
+   algorithm's internal random-panel (3-col) and kernel params (2-col),
+   and #panels (a)(b)(c). Each one breaks down to fewer columns as the
+   viewport narrows so nothing gets crushed. */
+
+/* Medium: algorithm and panel internals start stacking. */
+@media (max-width: 1024px) {
+  .random-panel-grid {
+    grid-template-columns: 1fr auto;
+  }
+  .random-panel-grid .rp-points { grid-column: 1; grid-row: 1; padding-right: 0; }
+  .random-panel-grid .rp-seed   { grid-column: 1; grid-row: 2; padding-left: 0; }
+  .random-panel-grid > .rp-show { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+  .params-grid { grid-template-columns: 1fr; }
+}
+
+/* Narrow: Image and Algorithm stack on top of each other. */
+@media (max-width: 860px) {
+  #controls {
+    grid-template-columns: 1fr;
+  }
+  #controls .image-box { grid-column: 1; }
+  #controls .algo-box  { grid-column: 1; }
+  .image-box .img-preview-wrap { max-height: 360px; }
+  /* Panels go 2-col (c drops below) */
+  #panels {
+    flex-wrap: wrap;
+  }
+  #panels .panel { flex: 1 1 calc(50% - 16px); min-width: 0; }
+}
+
+/* Existing: very narrow — single column everywhere. */
 @media (max-width: 600px) {
-  #controls { flex-direction: column; }
+  #controls { display: flex; flex-direction: column; }
   #panels { flex-direction: column; }
   .panel { flex: unset; width: 100%; }
   #results-inner { flex-direction: column; }
   #results-charts { width: 100%; flex-direction: row; flex-wrap: wrap; }
   .chart-wrap { flex: 1 1 240px; }
+  .random-panel-grid {
+    grid-template-columns: 1fr;
+  }
+  .random-panel-grid > .rp-show { grid-column: 1; grid-row: 3; align-self: start; justify-self: start; }
+}
+
+/* ── p > 1 warning modal ──────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-backdrop.hidden {
+  display: none;
+}
+
+#p-modal {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+  padding: 28px 32px 24px;
+  max-width: 420px;
+  width: calc(100% - 48px);
+  font-family: Georgia, serif;
+}
+#p-modal h3 {
+  font-size: 1.05em;
+  margin-bottom: 12px;
+  color: #222;
+}
+#p-modal p {
+  font-size: 0.92em;
+  line-height: 1.55;
+  color: #444;
+  margin-bottom: 10px;
+}
+#p-modal p:last-child { margin-bottom: 0; }
+
+#p-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 1.4em;
+  line-height: 1;
+  color: #888;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin: 0;
+}
+#p-modal-close:hover { background: #f0f0f0; color: #333; }
+
+/* ── Slow-run warning modal ───────────────────────────────────────────────── */
+#slow-modal {
+  position: relative;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+  padding: 28px 32px 24px;
+  max-width: 460px;
+  width: calc(100% - 48px);
+  font-family: Georgia, serif;
+}
+#slow-modal h3 {
+  font-size: 1.05em;
+  margin-bottom: 12px;
+  color: #222;
+}
+#slow-modal p {
+  font-size: 0.92em;
+  line-height: 1.55;
+  color: #444;
+  margin-bottom: 18px;
+}
+#slow-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 1.4em;
+  line-height: 1;
+  color: #888;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin: 0;
+}
+#slow-modal-close:hover { background: #f0f0f0; color: #333; }
+.slow-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }

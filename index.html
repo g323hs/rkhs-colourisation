@@ -8,22 +8,33 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="app">
-  <h1>RKHS Image Colourisation</h1>
+<div id="app" data-screen-label="01 Colouriser">
+  <h1>Image Colourisation</h1>
 
   <div id="controls">
 
-    <fieldset>
-      <legend>Image</legend>
+    <!-- ── Image box ──────────────────────────────────────────── -->
+    <fieldset class="box image-box">
+      <legend class="box-title">Image</legend>
       <div class="slider-row">
-        <label for="default-img" style="width:auto;white-space:nowrap;">Default</label>
+        <label for="default-img" style="width:auto;white-space:nowrap;">Select image:</label>
         <select id="default-img" style="flex:1;min-width:0;">
           <option value="images/IMG_6006.jpg" selected>IMG_6006</option>
+          <option value="images/worcester.png">Worcester College, Oxford</option>
+          <option value="images/waterfall.png">Waterfall (Escher)</option>
+          <option value="images/penrose_tiling.png">Penrose tiling</option>
+          <option value="images/penrose_triangle.png">Penrose triangle</option>
+          <option value="images/gradient_disc.png">Gradient disc</option>
+          <option value="images/interference_pattern.png">Interference pattern</option>
           <option value="images/complex_pattern.png">Complex pattern</option>
           <option value="images/flag_quarters.png">Quarters flag</option>
           <option value="images/gradient_radial.png">Radial gradient</option>
           <option value="images/checkerboard.png">Checkerboard</option>
         </select>
+      </div>
+      <label class="file-btn file-btn-top" for="img-upload">Upload / Take Photo</label>
+      <div class="img-preview-wrap">
+        <img id="image-preview" alt="current image preview">
       </div>
       <div class="slider-row">
         <label for="img-scale" style="width:auto;white-space:nowrap;">Scale</label>
@@ -32,79 +43,218 @@
       </div>
       <div id="img-info"></div>
       <div id="img-scale-warn" class="hidden"></div>
-      <label class="file-btn" for="img-upload">Upload / Take Photo</label>
       <input type="file" id="img-upload" accept="image/*">
     </fieldset>
 
-    <fieldset>
-      <legend>Sampling</legend>
-      <div class="slider-row">
-        <label for="point-method" style="width:auto;white-space:nowrap;">Method</label>
-        <select id="point-method" style="flex:1;min-width:0;">
-          <option value="grid">Regular grid</option>
-          <option value="random" selected>Random</option>
-          <option value="user">User-selected</option>
-        </select>
+    <!-- ── Algorithm super-box ────────────────────────────────── -->
+    <fieldset class="box algo-box">
+      <legend class="box-title">Algorithm &amp; Parameters</legend>
+
+      <!-- Mode segmented control -->
+      <div class="mode-toggle" role="tablist" aria-label="Algorithm mode">
+        <button type="button" class="mode-btn active" data-mode="manual"    role="tab" aria-selected="true">Manual</button>
+        <button type="button" class="mode-btn"        data-mode="automatic" role="tab" aria-selected="false">Automatic</button>
       </div>
 
-      <div id="grid-panel" class="method-panel hidden">
-        <label>Width <input type="number" id="grid-w" value="5" min="1" max="30"></label>
-        <label>Height <input type="number" id="grid-h" value="5" min="1" max="30"></label>
+      <!-- ── MANUAL / AUTOMATIC panels (same-height stack) ──── -->
+      <div class="mode-panels-wrap">
+
+      <!-- ── MANUAL MODE ────────────────────────────────────── -->
+      <div id="manual-mode" class="mode-panel">
+
+        <fieldset class="subbox sampling-box">
+          <legend>POINT SAMPLING</legend>
+          <div class="slider-row">
+            <label for="point-method" style="width:auto;white-space:nowrap;">Select method:</label>
+            <select id="point-method" style="flex:1;min-width:0;">
+              <option value="grid">Regular grid</option>
+              <option value="random" selected>Random</option>
+              <option value="user">User-selected</option>
+            </select>
+          </div>
+
+          <div class="method-panels-wrap">
+            <div id="grid-panel" class="method-panel invis">
+              <label>Width <input type="number" id="grid-w" value="5" min="1" max="30"></label>
+              <label>Height <input type="number" id="grid-h" value="5" min="1" max="30"></label>
+            </div>
+
+            <div id="random-panel" class="method-panel random-panel-grid">
+              <div class="master-row slider-master rp-points">
+                <label for="n-random">n <span class="hint">sample points</span></label>
+                <div class="ctl">
+                  <input type="range"  id="n-random-slider" min="10" max="500" step="10" value="200">
+                  <input type="number" id="n-random" class="val-out" min="1" max="500" step="10" value="200">
+                </div>
+              </div>
+              <div class="master-row rp-seed">
+                <label for="seed-fixed">Seed</label>
+                <div class="seed-group" role="radiogroup" aria-label="Seed mode">
+                  <label class="seed-opt">
+                    <input type="radio" name="seed-mode" value="random" id="seed-random">
+                    <span>Random</span>
+                  </label>
+                  <label class="seed-opt">
+                    <input type="radio" name="seed-mode" value="seed" id="seed-fixed" checked>
+                    <span>Seed</span>
+                    <input type="number" id="seed" value="42" min="0">
+                  </label>
+                </div>
+              </div>
+              <label class="show-points-toggle rp-show"><input type="checkbox" id="show-points" checked> Show points</label>
+            </div>
+
+            <div id="user-panel" class="method-panel invis">
+              <button id="tool-pick" class="tool-btn active">Pick</button>
+              <button id="tool-remove" class="tool-btn">Remove</button>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="subbox params-grid">
+          <legend>Kernel parameters</legend>
+
+          <div class="master-row full-row">
+            <label for="kernel-type">Kernel</label>
+            <div class="ctl">
+              <select id="kernel-type" class="ctl-select">
+                <option value="gaussian">Gaussian</option>
+                <option value="wendland">Wendland C2</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="master-row slider-master">
+            <label for="sigma1">&#963;&#8321; <span class="hint">spatial bandwidth</span></label>
+            <div class="ctl">
+              <input type="range"  id="sigma1"     min="-3" max="2.25" step="0.25" value="-1">
+              <input type="number" id="sigma1-num" min="0.001" max="200" step="any" value="0.1" class="val-out">
+            </div>
+          </div>
+
+          <div class="master-row slider-master">
+            <label for="sigma2">&#963;&#8322; <span class="hint">intensity bandwidth</span></label>
+            <div class="ctl">
+              <input type="range"  id="sigma2"     min="-3" max="2.25" step="0.25" value="0">
+              <input type="number" id="sigma2-num" min="0.001" max="200" step="any" value="1" class="val-out">
+            </div>
+          </div>
+
+          <div class="master-row slider-master">
+            <label for="p-param">p <span class="hint">intensity exponent</span></label>
+            <div class="ctl">
+              <input type="range"  id="p-param" min="0.1" max="3" step="0.1" value="1">
+              <input type="number" id="p-num"   min="0.1" max="3" step="0.1" value="1" class="val-out">
+            </div>
+          </div>
+
+          <div class="master-row slider-master">
+            <label for="delta">&#948; <span class="hint">regularisation parameter</span></label>
+            <div class="ctl">
+              <input type="range"  id="delta"     min="-8" max="1" step="1" value="-1">
+              <input type="number" id="delta-num" min="1e-8" max="10" step="any" value="0.1" class="val-out">
+            </div>
+          </div>
+        </fieldset>
       </div>
 
-      <div id="random-panel" class="method-panel">
-        <label>Points <input type="number" id="n-random" value="200" min="1" max="500"></label>
-        <label>
-          <input type="checkbox" id="use-seed" checked>
-          Seed <input type="number" id="seed" value="42" min="0">
+      <!-- ── AUTOMATIC MODE ─────────────────────────────────── -->
+      <div id="auto-mode" class="mode-panel hidden">
+
+        <p class="auto-hint">
+          Points and parameters are chosen automatically from the master
+          parameters below.
+        </p>
+
+        <fieldset class="subbox master-params" id="master-fieldset">
+          <legend>Master parameters</legend>
+
+          <div class="master-row slider-master">
+            <label for="m-beta1">&#946;&#8321; <span class="hint">&#963;&#8321; coverage</span></label>
+            <div class="ctl">
+              <input type="range" id="m-beta1" min="1" max="99" step="1" value="95">
+              <input type="number" id="m-beta1-out" class="pct-out" min="1" max="99" step="1" value="95">
+            </div>
+          </div>
+
+          <div class="master-row slider-master">
+            <label for="m-beta2">&#946;&#8322; <span class="hint">&#963;&#8322; coverage</span></label>
+            <div class="ctl">
+              <input type="range" id="m-beta2" min="1" max="99" step="1" value="95">
+              <input type="number" id="m-beta2-out" class="pct-out" min="1" max="99" step="1" value="95">
+            </div>
+          </div>
+
+          <div class="master-row slider-master">
+            <label for="m-nfrac">N<sub>fraction</sub> <span class="hint">pixels sampled</span></label>
+            <div class="ctl">
+              <input type="range" id="m-nfrac" min="0.1" max="10" step="0.1" value="1">
+              <input type="number" id="m-nfrac-out" class="pct-out" min="0.1" max="10" step="0.1" value="1">
+            </div>
+          </div>
+
+          <div class="master-row slider-master">
+            <label for="m-fillfrac">Fill<sub>fraction</sub> <span class="hint">spatial-fill share</span></label>
+            <div class="ctl">
+              <input type="range" id="m-fillfrac" min="0" max="20" step="0.5" value="2">
+              <input type="number" id="m-fillfrac-out" class="pct-out" min="0" max="20" step="0.5" value="2">
+            </div>
+          </div>
+
+          <div class="master-row slider-master">
+            <label for="m-density-slider">&#958; <span class="hint">edge / smooth density ratio</span></label>
+            <div class="ctl">
+              <input type="range" id="m-density-slider" min="0" max="8" step="1" value="4">
+              <input type="number" id="m-density" value="3" min="0.01" step="any" class="val-out">
+            </div>
+          </div>
+
+          <div class="master-row master-seed-row">
+            <label for="m-seed-fixed">Seed <span class="hint">point sampling</span></label>
+            <div class="seed-group seed-group-master" role="radiogroup" aria-label="Auto-mode seed">
+              <label class="seed-opt">
+                <input type="radio" name="m-seed-mode" value="random" id="m-seed-random">
+                <span>Random</span>
+              </label>
+              <label class="seed-opt">
+                <input type="radio" name="m-seed-mode" value="seed" id="m-seed-fixed" checked>
+                <span>Seed</span>
+                <input type="number" id="m-seed" value="42" min="0">
+              </label>
+            </div>
+          </div>
+
+          <div class="master-row full-row master-reset-row">
+            <button type="button" id="reset-master" class="btn-reset">Reset to defaults</button>
+          </div>
+        </fieldset>
+
+        <div class="auto-summary" id="auto-summary">
+          <span class="k">n =</span> <span class="v" id="auto-n">—</span>
+          <span class="sep">·</span>
+          <span class="k">&#963;&#8321; ≈</span> <span class="v" id="auto-s1">—</span>
+          <span class="sep">·</span>
+          <span class="k">&#963;&#8322; ≈</span> <span class="v" id="auto-s2">—</span>
+        </div>
+
+        <label class="pipeline-toggle-label">
+          <input type="checkbox" id="show-pipeline">
+          Show pipeline stages
         </label>
       </div>
 
-      <div id="user-panel" class="method-panel hidden">
-        <button id="tool-pick" class="tool-btn active">Pick</button>
-        <button id="tool-remove" class="tool-btn">Remove</button>
+      </div><!-- /.mode-panels-wrap -->
+
+      <!-- Shared action buttons pinned to the bottom of the Algorithm box -->
+      <div class="algo-actions">
+        <p class="algo-blurb"><b>RKHS colourisation</b> reconstructs the full colour image from a small set of known sample points using kernel interpolation.</p>
+        <div class="action-row">
+          <button id="gen-pts-btn"   class="btn-primary">Generate points</button>
+          <button id="clear-pts-btn" class="btn-danger">Clear</button>
+        </div>
+        <button id="colourise-btn" class="btn-go">Colourise</button>
       </div>
 
-      <div style="display:flex;gap:8px;margin-top:10px;">
-        <button id="gen-pts-btn" style="flex:1;margin-top:0;">Generate points</button>
-        <button id="clear-pts" style="margin-top:0;background:#933;">Clear</button>
-      </div>
-      <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:0.9em;cursor:pointer;">
-        <input type="checkbox" id="show-points" checked>
-        Show points
-      </label>
-    </fieldset>
-
-    <fieldset>
-      <legend>Kernel parameters</legend>
-      <div class="param-row">
-        <label for="kernel-type" style="width:auto;white-space:nowrap;">Kernel</label>
-        <select id="kernel-type" style="flex:1;min-width:0;margin:0;padding:3px 6px;font-size:0.88em;">
-          <option value="gaussian">Gaussian</option>
-          <option value="wendland">Wendland C2</option>
-        </select>
-      </div>
-      <div class="param-row">
-        <label for="sigma1">&#963;&#8321;</label>
-        <input type="range" id="sigma1" min="0.1" max="200" step="0.1" value="0.1">
-        <input type="number" id="sigma1-num" value="0.1" min="0.1" max="200" step="0.1">
-      </div>
-      <div class="param-row">
-        <label for="sigma2">&#963;&#8322;</label>
-        <input type="range" id="sigma2" min="0.1" max="200" step="0.1" value="1">
-        <input type="number" id="sigma2-num" value="1" min="0.1" max="200" step="0.1">
-      </div>
-      <div class="param-row">
-        <label for="p-param">p</label>
-        <input type="range" id="p-param" min="0.1" max="3" step="0.1" value="1">
-        <input type="number" id="p-num" value="1" min="0.1" max="3" step="0.1">
-      </div>
-      <div class="param-row">
-        <label for="delta">&#948;</label>
-        <input type="range" id="delta" min="0.000001" max="1" step="0.000001" value="0.1">
-        <input type="number" id="delta-num" value="0.1" min="0.000001" max="1" step="0.000001">
-      </div>
-      <button id="colourise-btn">Colourise</button>
       <p id="status"></p>
     </fieldset>
 
@@ -112,15 +262,27 @@
 
   <div id="panels">
     <div class="panel">
-      <div class="panel-label"><b>(a)</b> Original</div>
+      <div class="panel-label" id="panel-a-label"><b>(a)</b> Scaled image</div>
       <div class="img-box"><canvas id="canvas-a"></canvas></div>
     </div>
+    <div class="panel pipeline-panel">
+      <div class="panel-label"><b>(b)</b> Greyscale</div>
+      <div class="img-box"><canvas id="canvas-grey"></canvas></div>
+    </div>
+    <div class="panel pipeline-panel">
+      <div class="panel-label"><b>(c)</b> Raw edge mask</div>
+      <div class="img-box"><canvas id="canvas-raw-mask"></canvas></div>
+    </div>
+    <div class="panel pipeline-panel">
+      <div class="panel-label"><b>(d)</b> Smoothed edge mask</div>
+      <div class="img-box"><canvas id="canvas-smooth-mask"></canvas></div>
+    </div>
     <div class="panel">
-      <div class="panel-label"><b>(b)</b> Greyscale with data points <i>D</i></div>
+      <div class="panel-label" id="panel-b-label"><b>(b)</b> Greyscale with data points <i>D</i></div>
       <div class="img-box"><div id="canvas-b-wrap"><canvas id="canvas-b-dots"></canvas></div></div>
     </div>
     <div class="panel">
-      <div class="panel-label"><b>(c)</b> Colourised output</div>
+      <div class="panel-label" id="panel-c-label"><b>(c)</b> Colourised output</div>
       <div class="img-box"><canvas id="canvas-c"></canvas></div>
     </div>
   </div>
@@ -170,6 +332,35 @@
   </div>
 
 </div>
+
+<!-- ── Slow-run warning modal ──────────────────────────────────────────── -->
+<div id="slow-modal-backdrop" class="modal-backdrop hidden" aria-hidden="true">
+  <div id="slow-modal" role="alertdialog" aria-modal="true" aria-labelledby="slow-modal-title">
+    <button id="slow-modal-close" aria-label="Close">&times;</button>
+    <h3 id="slow-modal-title">This may take a while</h3>
+    <p id="slow-modal-body"></p>
+    <div class="slow-modal-actions">
+      <button id="slow-cancel"   class="btn-danger">Cancel</button>
+      <button id="slow-rescale"  class="btn-primary">Reduce scale</button>
+      <button id="slow-continue" class="btn-go"     >Continue anyway</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── p > 1 warning modal ─────────────────────────────────────────────── -->
+<div id="p-modal-backdrop" class="modal-backdrop hidden" aria-hidden="true">
+  <div id="p-modal" role="alertdialog" aria-modal="true" aria-labelledby="p-modal-title">
+    <button id="p-modal-close" aria-label="Close">&times;</button>
+    <h3 id="p-modal-title">Note on the exponent <i>p</i></h3>
+    <p>
+      In practice, <i>p</i> should be bounded above by&nbsp;<b>1</b> — values
+      above&nbsp;1 compress the intensity kernel and can degrade the
+      colourisation quality.
+    </p>
+    <p>You are free to experiment with higher values, but results may be unexpected.</p>
+  </div>
+</div>
+
 <script src="colourise.js"></script>
 <script src="sketch.js"></script>
 </body>
