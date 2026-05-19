@@ -102,7 +102,7 @@ function buildKD(pts, W, H, greyFlat, sigma1, sigma2, p, delta, kernel) {
 // ── Main colourisation ────────────────────────────────────────────────────────
 
 // pts: [{x, y, r, g, b}], greyFlat: Uint8Array (W*H), returns Uint8ClampedArray (W*H*4).
-function colourise(pts, W, H, greyFlat, sigma1, sigma2, p, delta, kernel) {
+async function colourise(pts, W, H, greyFlat, sigma1, sigma2, p, delta, kernel, onProgress) {
   const n = pts.length;
   if (n === 0) return null;
 
@@ -119,7 +119,16 @@ function colourise(pts, W, H, greyFlat, sigma1, sigma2, p, delta, kernel) {
   const ptI = pts.map(pt => greyFlat[pt.y * W + pt.x]);
 
   const out = new Uint8ClampedArray(W * H * 4);
+  let lastYield = performance.now();
+
   for (let py = 0; py < H; py++) {
+    const t = performance.now();
+    if (t - lastYield >= 16) {
+      if (onProgress) onProgress(py / H);
+      await new Promise(r => requestAnimationFrame(r));
+      lastYield = performance.now();
+    }
+
     for (let px = 0; px < W; px++) {
       const pix = py * W + px;
       const Iz  = greyFlat[pix];
@@ -142,6 +151,7 @@ function colourise(pts, W, H, greyFlat, sigma1, sigma2, p, delta, kernel) {
       out[base + 3] = 255;
     }
   }
+  if (onProgress) onProgress(1);
   return out;
 }
 

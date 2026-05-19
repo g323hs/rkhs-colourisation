@@ -13,6 +13,8 @@ const state = {
   mode:        'manual',   // 'manual' | 'automatic'
   p5cnv:       null,
   originalImg: null,
+  autoSigma1:  null,  // computed by "Calculate parameters"
+  autoSigma2:  null,
 };
 
 // Defaults for the master parameters (Automatic mode).
@@ -33,6 +35,37 @@ let uploadCounter = 0;
 
 const TARGET_PIXELS = 160000;
 
+// Discrete steps for the ξ (density ratio) slider — 9 stops.
+const DENSITY_STEPS = [0.1, 0.5, 1, 2, 3, 5, 10, 50, 100];
+function densityValToIdx(val) {
+  let best = 0, bestDist = Infinity;
+  DENSITY_STEPS.forEach((s, i) => { const d = Math.abs(s - val); if (d < bestDist) { bestDist = d; best = i; } });
+  return best;
+}
+
+// p slider: 0–20 steps, midpoint (10) = 1.0; left half [0.1,1], right half [1,2].
+function pIdxToVal(idx) {
+  if (idx <= 10) return 0.1 + (1.0 - 0.1) * (idx / 10);
+  return 1.0 + (2.0 - 1.0) * ((idx - 10) / 10);
+}
+function pValToIdx(val) {
+  if (val <= 1.0) return Math.round((val - 0.1) / (1.0 - 0.1) * 10);
+  return Math.round(10 + (val - 1.0) / (2.0 - 1.0) * 10);
+}
+
+// Scale slider: 0–40 steps, midpoint (20) = recommendedScale.
+const SCALE_STOPS = 40;
+function scaleIdxToVal(idx, recScale) {
+  const minScale = Math.max(0.05, recScale * 0.2);
+  if (idx <= SCALE_STOPS / 2) return minScale + (recScale - minScale) * (idx / (SCALE_STOPS / 2));
+  return recScale + (1 - recScale) * ((idx - SCALE_STOPS / 2) / (SCALE_STOPS / 2));
+}
+function scaleValToIdx(val, recScale) {
+  const minScale = Math.max(0.05, recScale * 0.2);
+  if (val <= recScale) return Math.round((val - minScale) / (recScale - minScale) * (SCALE_STOPS / 2));
+  return Math.round(SCALE_STOPS / 2 + (val - recScale) / (1 - recScale) * (SCALE_STOPS / 2));
+}
+
 function computeRecommendedScale(origW, origH) {
   const origPixels = origW * origH;
   if (origPixels <= TARGET_PIXELS) return 1.0;  const raw = Math.sqrt(TARGET_PIXELS / origPixels);
@@ -48,7 +81,7 @@ function updateImgInfo() {
 
   const oW = state.originalImg.naturalWidth;
   const oH = state.originalImg.naturalHeight;
-  const scale = parseFloat(document.getElementById('img-scale').value) || 1;
+  const scale = parseFloat(document.getElementById('img-scale-num').value) || 1;
   const sW = Math.max(1, Math.round(oW * scale));
   const sH = Math.max(1, Math.round(oH * scale));
   const fmt = n => n.toLocaleString();
@@ -66,8 +99,8 @@ function updateImgInfo() {
     document.getElementById('use-recommended-scale').addEventListener('click', () => {
       const sl = document.getElementById('img-scale');
       const nm = document.getElementById('img-scale-num');
-      sl.value = recommendedScale;
-      nm.value = recommendedScale;
+      sl.value = SCALE_STOPS / 2;
+      nm.value = recommendedScale.toFixed(2);
       updateImgInfo();
       sl.dispatchEvent(new Event('change', { bubbles: true }));
     });
@@ -98,7 +131,37 @@ function setup() {
   noLoop();
 }
 
+function getPtsMode() {
+  const active = document.querySelector('.pts-mode-btn.active');
+  return active ? active.dataset.ptsMode : 'points';
+}
+
+let _ptsModeAutoGreyscale = false;
+
+function updatePtsModeButtons() {
+  const hasPoints = state.points && state.points.length > 0;
+  const btns = document.querySelectorAll('.pts-mode-btn');
+  if (!hasPoints) {
+    btns.forEach(btn => {
+      const m = btn.dataset.ptsMode;
+      const dis = (m === 'points' || m === 'coloured');
+      btn.setAttribute('aria-disabled', dis ? 'true' : 'false');
+      if (dis) btn.classList.remove('active');
+      if (m === 'greyscale') btn.classList.add('active');
+    });
+    _ptsModeAutoGreyscale = true;
+  } else {
+    btns.forEach(btn => { btn.setAttribute('aria-disabled', 'false'); });
+    if (_ptsModeAutoGreyscale) {
+      btns.forEach(b => b.classList.remove('active'));
+      document.querySelector('.pts-mode-btn[data-pts-mode="points"]').classList.add('active');
+      _ptsModeAutoGreyscale = false;
+    }
+  }
+}
+
 function draw() {
+  updatePtsModeButtons();
   background(230);
   if (!state.greyFlat) {
     fill(160); noStroke();
@@ -107,6 +170,7 @@ function draw() {
     return;
   }
 
+  const ptsMode = getPtsMode();
   const idata = new ImageData(state.W, state.H);
   for (let i = 0; i < state.W * state.H; i++) {
     const g = state.greyFlat[i];
@@ -115,8 +179,20 @@ function draw() {
     idata.data[i * 4 + 2] = g;
     idata.data[i * 4 + 3] = 255;
   }
-  drawingContext.putImageData(idata, 0, 0);
 
+  if (ptsMode === 'coloured' && state.points.length) {
+    for (const pt of state.points) {
+      const px = Math.round(pt.x), py = Math.round(pt.y);
+      if (px >= 0 && px < state.W && py >= 0 && py < state.H) {
+        const idx = (py * state.W + px) * 4;
+        idata.data[idx]     = pt.r;
+        idata.data[idx + 1] = pt.g;
+        idata.data[idx + 2] = pt.b;
+      }
+    }
+  }
+
+  drawingContext.putImageData(idata, 0, 0);
   drawDots();
 }
 
@@ -158,18 +234,16 @@ function drawDots() {
     ctx.strokeRect(ox + 2, oy + 2, renderW - 4, renderH - 4);
   }
 
-  const showPts = document.getElementById('show-points').checked;
-  if (!state.greyFlat || !showPts) return;
+  if (!state.greyFlat || getPtsMode() !== 'points') return;
 
   const scaleX = renderW / state.W;
   const scaleY = renderH / state.H;
 
   // Adaptive radius: shrinks as point count grows so greyscale remains visible.
-  // Target: dots cover roughly 15% of image area at most.
   const n = state.points.length || 1;
   const pixelsPerDot = (renderW * renderH) / n;
-  const maxR = Math.sqrt(pixelsPerDot * 0.15 / Math.PI);
-  const R = Math.min(4.5, Math.max(1.2, maxR));
+  const maxR = Math.sqrt(pixelsPerDot * 0.07 / Math.PI);
+  const R = Math.min(3.5, Math.max(1.0, maxR));
 
   // Fixed thin border widths regardless of R
   const blackW = 1.2;
@@ -266,7 +340,7 @@ function mouseClicked() {
 // ── Image loading ─────────────────────────────────────────────────────────────
 
 function applyScale(img, preservePoints) {
-  const scale = parseFloat(document.getElementById('img-scale').value) || 1;
+  const scale = parseFloat(document.getElementById('img-scale-num').value) || 1;
   const W = Math.max(1, Math.round(img.naturalWidth  * scale));
   const H = Math.max(1, Math.round(img.naturalHeight * scale));
 
@@ -345,7 +419,7 @@ function applyScale(img, preservePoints) {
   canvC.width = W; canvC.height = H;
   canvC.getContext('2d').clearRect(0, 0, W, H);
 
-  setStatus(`${W}×${H} px`);
+  setStatus('');
   updateImgInfo();
   if (typeof updateAutoSummary === 'function') updateAutoSummary();
   redraw();
@@ -355,7 +429,7 @@ function loadImageAndAutoScale(img) {
   recommendedScale = computeRecommendedScale(img.naturalWidth, img.naturalHeight);
   const sl = document.getElementById('img-scale');
   const nm = document.getElementById('img-scale-num');
-  if (sl) { sl.value = recommendedScale; nm.value = recommendedScale; }
+  if (sl) { sl.value = SCALE_STOPS / 2; nm.value = recommendedScale.toFixed(2); }
   state.originalImg = img;
   // Mirror the just-loaded image into the Image-box preview at full resolution
   // (the wrap caps its display height; max-width keeps it bounded).
@@ -370,8 +444,8 @@ function drawEdgeMasks(greyFlat, W, H, precomputed) {
 
   const rawRGBA = new Uint8ClampedArray(N * 4);
   for (let i = 0; i < N; i++) {
-    const v = rawMask[i] ? 255 : 0;
-    rawRGBA[i*4] = rawRGBA[i*4+1] = rawRGBA[i*4+2] = v;
+    if (rawMask[i]) { rawRGBA[i*4]=220; rawRGBA[i*4+1]=50;  rawRGBA[i*4+2]=50;  }
+    else            { rawRGBA[i*4]=50;  rawRGBA[i*4+1]=100; rawRGBA[i*4+2]=200; }
     rawRGBA[i*4+3] = 255;
   }
   const cr = document.getElementById('canvas-raw-mask');
@@ -428,7 +502,7 @@ function syncLogSlider(sliderId, numId, fmtFn) {
 }
 
 function fmtSigma(v) {
-  return parseFloat(v.toPrecision(3)).toString();
+  return parseFloat(v.toPrecision(2)).toString();
 }
 
 function fmtDelta(v) {
@@ -484,16 +558,47 @@ function getMasterParams() {
   };
 }
 
-function resetMasterParams() {
-  // Sliders hold percentages; only β/N/Fill are editable now.
-  document.getElementById('m-beta1').value    = MASTER_DEFAULTS.beta1    * 100;
-  document.getElementById('m-beta2').value    = MASTER_DEFAULTS.beta2    * 100;
+function resetManualSampling() {
+  const sel = document.getElementById('point-method');
+  sel.value = 'random';
+  sel.dispatchEvent(new Event('change'));
+  document.getElementById('grid-w').value = 5;
+  document.getElementById('grid-h').value = 5;
+  document.getElementById('n-random-slider').value = 200;
+  document.getElementById('n-random').value = 200;
+  const fixedRadio = document.getElementById('seed-fixed');
+  fixedRadio.checked = true;
+  document.getElementById('seed').value = 42;
+}
+
+function resetAutoSampling() {
   document.getElementById('m-nfrac').value    = MASTER_DEFAULTS.nFrac    * 100;
   document.getElementById('m-fillfrac').value = MASTER_DEFAULTS.fillFrac * 100;
-  document.getElementById('m-density').value         = MASTER_DEFAULTS.density.toFixed(1);
-  document.getElementById('m-density-slider').value  = MASTER_DEFAULTS.density;
+  document.getElementById('m-density').value        = MASTER_DEFAULTS.density;
+  document.getElementById('m-density-slider').value = densityValToIdx(MASTER_DEFAULTS.density);
   refreshMasterReadouts();
   updateAutoSummary();
+}
+
+function resetAutoParams() {
+  document.getElementById('m-beta1').value = MASTER_DEFAULTS.beta1 * 100;
+  document.getElementById('m-beta2').value = MASTER_DEFAULTS.beta2 * 100;
+  refreshMasterReadouts();
+  updateAutoSummary();
+}
+
+function resetMasterParams() {
+  resetAutoSampling();
+  resetAutoParams();
+}
+
+function resetKernelParams() {
+  document.getElementById('kernel-type').value = 'gaussian';
+  setLogSlider('sigma1', 'sigma1-num', 0.1, fmtSigma);
+  setLogSlider('sigma2', 'sigma2-num', 1.0, fmtSigma);
+  document.getElementById('p-param').value = pValToIdx(1);
+  document.getElementById('p-num').value   = 1;
+  setLogSlider('delta', 'delta-num', 0.1, fmtDelta);
 }
 
 // Sync each slider's numeric readout to its current value.
@@ -555,18 +660,11 @@ function updateAutoSummary() {
   const nEl  = document.getElementById('auto-n');
   const s1El = document.getElementById('auto-s1');
   const s2El = document.getElementById('auto-s2');
-  if (!nEl) return;
-
-  const m = getMasterParams();
-  if (!state.W || !state.H) {
-    nEl.textContent = '—'; s1El.textContent = '—'; s2El.textContent = '—';
-    return;
-  }
-  const n = autoSampleCount(state.W, state.H, m.nFrac);
-  const { sigma1, sigma2 } = autoSigmas(state.W, state.H, n, m.p, m.beta1, m.beta2);
-  nEl.textContent  = n.toString();
-  s1El.textContent = formatNum(sigma1);
-  s2El.textContent = formatNum(sigma2);
+  if (nEl)  nEl.textContent  = '—';
+  if (s1El) s1El.textContent = '—';
+  if (s2El) s2El.textContent = '—';
+  state.autoSigma1 = null;
+  state.autoSigma2 = null;
 }
 
 function getAutoParams() {
@@ -599,8 +697,7 @@ function pushAutoToManual(ap) {
   };
   if (ap.sigma1 > 0) setLogSlider('sigma1', 'sigma1-num', ap.sigma1, fmtSigma);
   if (ap.sigma2 > 0) setLogSlider('sigma2', 'sigma2-num', ap.sigma2, fmtSigma);
-  set('p-param', ap.p);
-  set('p-num',   ap.p);
+  if (ap.p > 0) { document.getElementById('p-param').value = pValToIdx(ap.p); document.getElementById('p-num').value = ap.p; }
   if (ap.delta > 0)  setLogSlider('delta', 'delta-num', ap.delta, fmtDelta);
   set('n-random', ap.nRandom);
 }
@@ -626,7 +723,7 @@ function loadResult(id) {
 
   setLogSlider('sigma1', 'sigma1-num', r.sigma1, fmtSigma);
   setLogSlider('sigma2', 'sigma2-num', r.sigma2, fmtSigma);
-  document.getElementById('p-param').value = r.p;
+  document.getElementById('p-param').value = pValToIdx(r.p);
   document.getElementById('p-num').value   = r.p;
   setLogSlider('delta', 'delta-num', r.delta, fmtDelta);
   document.getElementById('kernel-type').value = r.kernel;
@@ -684,7 +781,7 @@ function renderTable() {
     const active = col.key === sortKey;
     const arrow  = active ? (sortAsc ? ' ▲' : ' ▼') : '';
     return `<th data-col="${col.key}" style="cursor:pointer;user-select:none">${col.label}${arrow}</th>`;
-  }).join('') + '<th></th>';
+  }).join('') + '<th>Load</th>';
 
   // Body — render results, then pad with empty placeholder rows so the table
   // always fills the same vertical space as the side-by-side charts.
@@ -774,45 +871,123 @@ function addResult(r) {
   selectResult(r.id);
 }
 
+// ── Colourise button loading state ────────────────────────────────────────────
+function setColouriseLoading(on, label) {
+  const btn = document.getElementById('colourise-btn');
+  if (on) {
+    if (!btn.classList.contains('loading')) {
+      btn._origHTML = btn.innerHTML;
+      btn.classList.add('loading');
+      btn.disabled = true;
+    }
+    btn.innerHTML =
+      `<span class="btn-progress-bar" style="width:0%"></span>` +
+      `<span class="btn-progress-text">${label || 'Computing…'}</span>`;
+  } else {
+    btn.innerHTML = btn._origHTML || 'Colourise';
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+function updateColouriseProgress(frac, label) {
+  const btn = document.getElementById('colourise-btn');
+  const bar = btn.querySelector('.btn-progress-bar');
+  const txt = btn.querySelector('.btn-progress-text');
+  if (bar) bar.style.width = `${Math.round(frac * 100)}%`;
+  if (txt && label) txt.textContent = label;
+}
+
+// ── Toast notifications ───────────────────────────────────────────────────────
+function showToast(msg) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = msg + '<button class="toast-close" aria-label="Dismiss">&times;</button>';
+  container.appendChild(toast);
+  const dismiss = () => {
+    if (toast.classList.contains('dismissing')) return;
+    toast.classList.add('dismissing');
+    toast.addEventListener('animationend', () => toast.remove(), { once: true });
+  };
+  toast.querySelector('.toast-close').addEventListener('click', dismiss);
+  setTimeout(dismiss, 5000);
+}
+
 // ── UI wiring ─────────────────────────────────────────────────────────────────
 
-// ── p > 1 warning modal ───────────────────────────────────────────────────────
+// ── p > 1 warning ─────────────────────────────────────────────────────────────
 (function () {
   let warned = false;
 
-  function closeModal() {
-    document.getElementById('p-modal-backdrop').classList.add('hidden');
-    document.getElementById('p-modal-backdrop').setAttribute('aria-hidden', 'true');
-  }
-
   function maybeWarn(value) {
-    if (warned || parseFloat(value) <= 1) return;
+    if (warned || parseFloat(value) <= 1 + 1e-9) return;
     warned = true;
-    const backdrop = document.getElementById('p-modal-backdrop');
-    backdrop.classList.remove('hidden');
-    backdrop.setAttribute('aria-hidden', 'false');
+    showToast('p > 1 compresses the intensity kernel and can degrade colourisation quality — proceed with care.');
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('p-modal-close').addEventListener('click', closeModal);
-    document.getElementById('p-modal-backdrop').addEventListener('click', e => {
-      if (e.target === e.currentTarget) closeModal();
-    });
-    document.getElementById('p-param').addEventListener('input',  e => maybeWarn(e.target.value));
-    document.getElementById('p-num'  ).addEventListener('change', e => maybeWarn(e.target.value));
+    document.getElementById('p-num').addEventListener('change', e => maybeWarn(parseFloat(e.target.value)));
   });
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
   syncLogSlider('sigma1',  'sigma1-num', fmtSigma);
   syncLogSlider('sigma2',  'sigma2-num', fmtSigma);
-  syncSliderNum('p-param', 'p-num');
+  // p slider: index-based so p=1 sits at midpoint.
+  (function () {
+    const sl = document.getElementById('p-param');
+    const nm = document.getElementById('p-num');
+    sl.addEventListener('input', () => {
+      const v = pIdxToVal(parseInt(sl.value));
+      nm.value = Math.round(v * 100) / 100;
+      maybeWarn(v);
+    });
+    nm.addEventListener('change', () => {
+      const v = parseFloat(nm.value);
+      if (Number.isFinite(v) && v >= 0.1 && v <= 2) sl.value = pValToIdx(v);
+      maybeWarn(v);
+    });
+  })();
   syncLogSlider('delta',   'delta-num',  fmtDelta);
-  syncSliderNum('img-scale',        'img-scale-num');
-  syncSliderNum('n-random-slider',  'n-random');
-  syncSliderNum('m-density-slider', 'm-density');
+  syncSliderNum('n-random-slider', 'n-random');
 
-  document.getElementById('img-scale').addEventListener('input', updateImgInfo);
+  // Scale slider: index-based mapping so recommended scale sits at midpoint.
+  (function () {
+    const sl = document.getElementById('img-scale');
+    const nm = document.getElementById('img-scale-num');
+    sl.addEventListener('input', () => {
+      const val = scaleIdxToVal(parseInt(sl.value), recommendedScale);
+      nm.value = Math.round(val * 100) / 100;
+      updateImgInfo();
+    });
+    nm.addEventListener('change', () => {
+      const v = parseFloat(nm.value);
+      if (Number.isFinite(v) && v > 0 && v <= 1) sl.value = scaleValToIdx(v, recommendedScale);
+    });
+  })();
+
+  // ξ slider: discrete steps.
+  (function () {
+    const sl = document.getElementById('m-density-slider');
+    const nm = document.getElementById('m-density');
+    sl.addEventListener('input', () => { nm.value = DENSITY_STEPS[parseInt(sl.value)]; updateAutoSummary(); });
+    nm.addEventListener('change', () => {
+      const v = parseFloat(nm.value);
+      if (Number.isFinite(v) && v > 0) sl.value = densityValToIdx(v);
+      updateAutoSummary();
+    });
+  })();
+
+  document.getElementById('reset-kernel').addEventListener('click', resetKernelParams);
+
+  // Clamp grid W/H to minimum 1.
+  ['grid-w', 'grid-h'].forEach(id => {
+    document.getElementById(id).addEventListener('change', function () {
+      if (!this.value || parseInt(this.value) < 1) this.value = 1;
+    });
+  });
+
   document.getElementById('img-scale-num').addEventListener('input', updateImgInfo);
   const rescale = () => {
     if (state.originalImg) {
@@ -889,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Object.entries(methodPanels).forEach(([m, id]) =>
       document.getElementById(id).classList.toggle('invis', m !== state.method)
     );
-    document.getElementById('gen-pts-btn').classList.toggle('hidden', state.method === 'user');
+    document.querySelectorAll('.gen-pts-btn').forEach(b => b.classList.toggle('hidden', state.method === 'user'));
     redraw();
   });
 
@@ -906,10 +1081,11 @@ document.addEventListener('DOMContentLoaded', () => {
     redraw();
   });
 
-  document.getElementById('clear-pts-btn').addEventListener('click', () => {
+  document.querySelectorAll('.clear-pts-btn').forEach(b => b.addEventListener('click', () => {
     state.points = [];
+    updateAutoSummary();
     redraw();
-  });
+  }));
 
   document.getElementById('clear-results-btn').addEventListener('click', () => {
     results.length = 0;
@@ -918,18 +1094,50 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCharts();
   });
 
-  document.getElementById('show-points').addEventListener('change', () => redraw());
+  document.querySelectorAll('.pts-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.getAttribute('aria-disabled') === 'true') {
+        showToast('Generate sample points first to use Points or Colour view.');
+        return;
+      }
+      _ptsModeAutoGreyscale = false;
+      document.querySelectorAll('.pts-mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      redraw();
+    });
+  });
 
   // ── Shared Generate-points handler (branches on mode) ──────────────────────
-  document.getElementById('gen-pts-btn').addEventListener('click', () => {
+  document.querySelectorAll('.gen-pts-btn').forEach(b => b.addEventListener('click', () => {
     if (!state.colourFlat) { setStatus('Upload an image first.'); return; }
 
     if (state.mode === 'automatic') {
-      const ap = getAutoParams();
-      state.points = generateRandom(state.W, state.H, state.colourFlat, ap.nRandom, ap.seed);
-      pushAutoToManual(ap);
-      setStatus(`${state.points.length} point${state.points.length !== 1 ? 's' : ''} placed (auto)`);
-      updateAutoSummary();
+      const pipelineMode = document.getElementById('show-pipeline').checked;
+      const m = getMasterParams();
+      const seedMode = (document.querySelector('input[name=m-seed-mode]:checked') || {}).value || 'seed';
+      const seed = seedMode === 'seed'
+        ? parseInt(document.getElementById('m-seed').value, 10)
+        : Math.floor(Math.random() * 2 ** 31);
+
+      const n = autoSampleCount(state.W, state.H, m.nFrac);
+      setStatus('Edge detection…');
+      const masks = detectEdges(state.greyFlat, state.W, state.H);
+      if (pipelineMode) drawEdgeMasks(null, state.W, state.H, masks);
+      setStatus('Sampling…');
+      state.points = sampleBlueNoise(state.W, state.H, state.colourFlat, state.greyFlat,
+        n, masks.smoothMask, m.density, m.fillFrac, seed);
+
+      // Show n, clear stale sigmas so user knows to recalculate
+      const nEl = document.getElementById('auto-n');
+      if (nEl) nEl.textContent = state.points.length.toString();
+      state.autoSigma1 = null;
+      state.autoSigma2 = null;
+      const s1El = document.getElementById('auto-s1');
+      const s2El = document.getElementById('auto-s2');
+      if (s1El) s1El.textContent = '—';
+      if (s2El) s2El.textContent = '—';
+
+      setStatus(`${state.points.length} point${state.points.length !== 1 ? 's' : ''} placed`);
       redraw();
       return;
     }
@@ -946,7 +1154,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     setStatus(`${state.points.length} point${state.points.length !== 1 ? 's' : ''} placed`);
     redraw();
-  });
+  }));
 
   // ── Slow-run warning modal ─────────────────────────────────────────────────
   // Warn when n × pixels > this; roughly corresponds to ~10 s on a mid-range laptop.
@@ -986,105 +1194,136 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ── Shared Colourise handler (branches on mode) ────────────────────────────
-  function runColourise() {
+  async function runColourise() {
     const isAuto = state.mode === 'automatic';
     const pipelineMode = isAuto && document.getElementById('show-pipeline').checked;
-
     let pr;
-    if (pipelineMode) {
-      // Full pipeline: edge detection → blue-noise sampling → sigma heuristics
+
+    if (isAuto) {
       const m = getMasterParams();
-      const n = autoSampleCount(state.W, state.H, m.nFrac);
-      const seedMode = (document.querySelector('input[name=m-seed-mode]:checked') || {}).value || 'seed';
-      const seed = seedMode === 'seed'
-        ? parseInt(document.getElementById('m-seed').value, 10)
-        : Math.floor(Math.random() * 2 ** 31);
 
-      setStatus('Edge detection…');
-      const masks = detectEdges(state.greyFlat, state.W, state.H);
-      drawEdgeMasks(null, state.W, state.H, masks);
+      // Step 1: generate points if not already done
+      if (state.points.length < 1) {
+        showToast('No sample points found — generating automatically.');
+        setColouriseLoading(true, 'Generating points…');
+        await new Promise(r => requestAnimationFrame(r));
+        const seedMode = (document.querySelector('input[name=m-seed-mode]:checked') || {}).value || 'seed';
+        const seed = seedMode === 'seed'
+          ? parseInt(document.getElementById('m-seed').value, 10)
+          : Math.floor(Math.random() * 2 ** 31);
+        updateColouriseProgress(0, 'Edge detection…');
+        const masks = detectEdges(state.greyFlat, state.W, state.H);
+        if (pipelineMode) drawEdgeMasks(null, state.W, state.H, masks);
+        updateColouriseProgress(0, 'Sampling points…');
+        const n = autoSampleCount(state.W, state.H, m.nFrac);
+        state.points = sampleBlueNoise(state.W, state.H, state.colourFlat, state.greyFlat,
+          n, masks.smoothMask, m.density, m.fillFrac, seed);
+        const nEl = document.getElementById('auto-n');
+        if (nEl) nEl.textContent = state.points.length.toString();
+        state.autoSigma1 = null;
+        state.autoSigma2 = null;
+        redraw();
+      } else {
+        setColouriseLoading(true, 'Computing…');
+        await new Promise(r => requestAnimationFrame(r));
+      }
 
-      setStatus('Sampling…');
-      state.points = sampleBlueNoise(
-        state.W, state.H, state.colourFlat, state.greyFlat,
-        n, masks.smoothMask, m.density, m.fillFrac, seed
-      );
-
-      setStatus('Computing σ heuristics…');
-      const { sigma1, sigma2 } = computeSigmasFromPoints(
-        state.points, state.W, state.H, state.greyFlat, m.p, m.beta1, m.beta2
-      );
+      // Step 2: compute sigmas if not already done
+      if (state.autoSigma1 == null || state.autoSigma2 == null) {
+        showToast('Parameters not calculated — computing σ₁ and σ₂ automatically.');
+        updateColouriseProgress(0, 'Computing σ₁, σ₂…');
+        await new Promise(r => requestAnimationFrame(r));
+        const { sigma1, sigma2 } = computeSigmasFromPoints(
+          state.points, state.W, state.H, state.greyFlat, m.p, m.beta1, m.beta2);
+        state.autoSigma1 = sigma1;
+        state.autoSigma2 = sigma2;
+        const s1El = document.getElementById('auto-s1');
+        const s2El = document.getElementById('auto-s2');
+        if (s1El) s1El.textContent = formatNum(sigma1);
+        if (s2El) s2El.textContent = formatNum(sigma2);
+      }
 
       pr = {
-        sigma1, sigma2,
+        sigma1:  state.autoSigma1,
+        sigma2:  state.autoSigma2,
         p:       m.p,
         delta:   m.delta,
-        nRandom: n,
-        seed,
+        nRandom: state.points.length,
+        seed:    0,
         kernel:  document.getElementById('kernel-type').value,
       };
       pushAutoToManual(pr);
-      redraw();
-    } else if (isAuto) {
-      pr = getAutoParams();
-      pushAutoToManual(pr);
-      if (state.points.length < 1) {
-        state.points = generateRandom(state.W, state.H, state.colourFlat, pr.nRandom, pr.seed);
-        redraw();
-      }
+
     } else {
+      // Manual mode: generate points if not already done
+      const pr0 = getParams();
       if (state.points.length < 1) {
-        setStatus('Add at least one point first.');
-        return;
+        showToast('No sample points found — generating automatically.');
+        setColouriseLoading(true, 'Generating points…');
+        await new Promise(r => requestAnimationFrame(r));
+        if (state.method === 'grid') {
+          state.points = generateGrid(state.W, state.H, state.colourFlat, pr0.gridW, pr0.gridH);
+        } else if (state.method === 'random') {
+          state.points = generateRandom(state.W, state.H, state.colourFlat, pr0.nRandom, pr0.seed);
+        } else {
+          setColouriseLoading(false);
+          setStatus('Add at least one point first (user mode).');
+          return;
+        }
+        redraw();
+      } else {
+        setColouriseLoading(true, 'Computing…');
+        await new Promise(r => requestAnimationFrame(r));
       }
-      pr = getParams();
+      pr = pr0;
     }
 
-    setStatus(isAuto ? 'Computing (auto)…' : 'Computing…');
-    setTimeout(() => {
-      try {
-        const out = colourise(
-          state.points, state.W, state.H, state.greyFlat,
-          pr.sigma1, pr.sigma2, pr.p, pr.delta, pr.kernel
-        );
-        if (!out) return;
+    try {
+      updateColouriseProgress(0, 'Colourising…');
+      const out = await colourise(
+        state.points, state.W, state.H, state.greyFlat,
+        pr.sigma1, pr.sigma2, pr.p, pr.delta, pr.kernel,
+        frac => updateColouriseProgress(frac, `Colourising… ${Math.round(frac * 100)}%`)
+      );
+      if (!out) { setColouriseLoading(false); return; }
 
-        const canvC = document.getElementById('canvas-c');
-        canvC.width  = state.W; canvC.height = state.H;
-        canvC.getContext('2d').putImageData(new ImageData(out, state.W, state.H), 0, 0);
+      const canvC = document.getElementById('canvas-c');
+      canvC.width  = state.W; canvC.height = state.H;
+      canvC.getContext('2d').putImageData(new ImageData(out, state.W, state.H), 0, 0);
 
-        const frob = frobeniusNorm(state.colourFlat, out, state.W, state.H);
-        const ssim = ssimIndex(state.colourFlat, out, state.W, state.H);
+      const frob = frobeniusNorm(state.colourFlat, out, state.W, state.H);
+      const ssim = ssimIndex(state.colourFlat, out, state.W, state.H);
 
-        document.getElementById('metric-frob').textContent = frob.toFixed(1);
-        document.getElementById('metric-ssim').textContent = ssim.toFixed(4);
+      document.getElementById('metric-frob').textContent = frob.toFixed(1);
+      document.getElementById('metric-ssim').textContent = ssim.toFixed(4);
 
-        addResult({
-          id:         results.length + 1,
-          kernel:     pr.kernel,
-          sigma1:     isAuto ? +pr.sigma1.toFixed(4) : pr.sigma1,
-          sigma2:     isAuto ? +pr.sigma2.toFixed(4) : pr.sigma2,
-          p:          pr.p,
-          delta:      pr.delta,
-          pts:        state.points.map(p => ({ ...p })),
-          nPoints:    state.points.length,
-          W:          state.W,   H:      state.H,
-          greyFlat:   new Uint8Array(state.greyFlat),
-          colourFlat: new Uint8Array(state.colourFlat),
-          out,
-          frob, ssim,
-        });
+      addResult({
+        id:         results.length + 1,
+        kernel:     pr.kernel,
+        sigma1:     isAuto ? +pr.sigma1.toFixed(4) : pr.sigma1,
+        sigma2:     isAuto ? +pr.sigma2.toFixed(4) : pr.sigma2,
+        p:          pr.p,
+        delta:      pr.delta,
+        pts:        state.points.map(p => ({ ...p })),
+        nPoints:    state.points.length,
+        W:          state.W,   H:      state.H,
+        greyFlat:   new Uint8Array(state.greyFlat),
+        colourFlat: new Uint8Array(state.colourFlat),
+        out,
+        frob, ssim,
+      });
 
-        if (isAuto && !pipelineMode) drawEdgeMasks(state.greyFlat, state.W, state.H);
+      if (isAuto && !pipelineMode) drawEdgeMasks(state.greyFlat, state.W, state.H);
 
-        setStatus(isAuto
-          ? `Auto done — n=${state.points.length}, σ₁=${formatNum(pr.sigma1)}, σ₂=${formatNum(pr.sigma2)}`
-          : `Done — ${state.points.length} point${state.points.length !== 1 ? 's' : ''}`);
-      } catch (err) {
-        setStatus('Error: ' + err.message);
-        console.error(err);
-      }
-    }, 20);
+      setStatus(isAuto
+        ? `Done — n=${state.points.length}, σ₁=${formatNum(pr.sigma1)}, σ₂=${formatNum(pr.sigma2)}`
+        : `Done — ${state.points.length} point${state.points.length !== 1 ? 's' : ''}`);
+      setColouriseLoading(false);
+    } catch (err) {
+      setStatus('Error: ' + err.message);
+      console.error(err);
+      setColouriseLoading(false);
+    }
   }
 
   document.getElementById('colourise-btn').addEventListener('click', () => {
@@ -1092,9 +1331,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Estimate work: n × W×H kernel evaluations.
     const isAuto = state.mode === 'automatic';
-    const nEst = isAuto
-      ? autoSampleCount(state.W, state.H, getMasterParams().nFrac)
-      : (state.points.length || parseInt(document.getElementById('n-random').value) || 1);
+    const nEst = state.points.length ||
+      (isAuto
+        ? autoSampleCount(state.W, state.H, getMasterParams().nFrac)
+        : (parseInt(document.getElementById('n-random').value) || 1));
     const work = nEst * state.W * state.H;
 
     if (work > SLOW_THRESHOLD) {
@@ -1123,18 +1363,31 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.classList.toggle('active', active);
       btn.setAttribute('aria-selected', active ? 'true' : 'false');
     });
-    document.getElementById('manual-mode').classList.toggle('hidden', mode !== 'manual');
-    document.getElementById('auto-mode'  ).classList.toggle('hidden', mode !== 'automatic');
+    // Show the active mode's fieldsets; hide (but keep layout space of) the other.
+    document.querySelectorAll('.mode-panel-item').forEach(el => {
+      el.classList.toggle('mode-hidden', el.dataset.forMode !== mode);
+    });
     // In Automatic mode, "Generate points" should always be available, even if
     // the (hidden) manual method is set to user-selected.
-    const gen = document.getElementById('gen-pts-btn');
-    if (mode === 'automatic') gen.classList.remove('hidden');
-    else                      gen.classList.toggle('hidden', state.method === 'user');
+    document.querySelectorAll('.gen-pts-btn').forEach(gen => {
+      if (mode === 'automatic') gen.classList.remove('hidden');
+      else gen.classList.toggle('hidden', state.method === 'user');
+    });
     if (mode === 'automatic') updateAutoSummary();
+    // Pipeline toggle only available in automatic mode.
+    const pipelineCb = document.getElementById('show-pipeline');
+    pipelineCb.disabled = mode !== 'automatic';
+    pipelineCb.closest('.panel-pipeline-toggle').classList.toggle('pipeline-toggle-disabled', mode !== 'automatic');
+    if (mode === 'manual' && pipelineCb.checked) {
+      pipelineCb.checked = false;
+      pipelineCb.dispatchEvent(new Event('change'));
+    }
   }
   document.querySelectorAll('.mode-btn').forEach(btn => {
     btn.addEventListener('click', () => setMode(btn.dataset.mode));
   });
+  // Initialise pipeline toggle state to match default manual mode.
+  setMode('manual');
 
   // ── Master parameter live wiring ───────────────────────────────────────────
   // Slider → number readout + summary
@@ -1161,21 +1414,116 @@ document.addEventListener('DOMContentLoaded', () => {
     num.addEventListener('change', () => { sl.value = num.value; updateAutoSummary(); });
   });
 
-  document.getElementById('reset-master').addEventListener('click', resetMasterParams);
+  document.getElementById('reset-manual-sampling').addEventListener('click', resetManualSampling);
+  document.getElementById('reset-auto-sampling').addEventListener('click', resetAutoSampling);
+  document.getElementById('reset-auto-params').addEventListener('click', resetAutoParams);
+
+  // Clear stale sigmas when β parameters change (user should recalculate)
+  ['m-beta1', 'm-beta2', 'm-beta1-out', 'm-beta2-out'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      state.autoSigma1 = null;
+      state.autoSigma2 = null;
+      const s1El = document.getElementById('auto-s1');
+      const s2El = document.getElementById('auto-s2');
+      if (s1El) s1El.textContent = '—';
+      if (s2El) s2El.textContent = '—';
+    });
+  });
+
+  document.getElementById('calc-auto-params-btn').addEventListener('click', () => {
+    if (!state.points.length) {
+      showToast('Generate sample points first, then calculate parameters.');
+      return;
+    }
+    const m = getMasterParams();
+    const { sigma1, sigma2 } = computeSigmasFromPoints(
+      state.points, state.W, state.H, state.greyFlat, m.p, m.beta1, m.beta2);
+    state.autoSigma1 = sigma1;
+    state.autoSigma2 = sigma2;
+    const s1El = document.getElementById('auto-s1');
+    const s2El = document.getElementById('auto-s2');
+    if (s1El) s1El.textContent = formatNum(sigma1);
+    if (s2El) s2El.textContent = formatNum(sigma2);
+    pushAutoToManual({ sigma1, sigma2, p: m.p, delta: m.delta,
+      nRandom: state.points.length, seed: 0,
+      kernel: document.getElementById('kernel-type').value });
+    setStatus(`σ₁ = ${formatNum(sigma1)}, σ₂ = ${formatNum(sigma2)}`);
+  });
 
   // Initialise summary on load.
   refreshMasterReadouts();
   updateAutoSummary();
 
   // ── Pipeline stage toggle ──────────────────────────────────────────────────
+  document.querySelector('.panel-pipeline-toggle').addEventListener('click', function (e) {
+    const cb = document.getElementById('show-pipeline');
+    if (cb.disabled) {
+      e.preventDefault();
+      showToast('Switch to Automatic mode to use pipeline stages.');
+    }
+  });
+
   document.getElementById('show-pipeline').addEventListener('change', function () {
     const on = this.checked;
-    document.getElementById('panels').classList.toggle('pipeline-mode', on);
+    const panelsEl = document.getElementById('panels');
+    const pipelinePanels = [...panelsEl.querySelectorAll('.pipeline-panel')];
+
     document.getElementById('panel-b-label').innerHTML = on
       ? '<b>(e)</b> Greyscale with data points <i>D</i>'
       : '<b>(b)</b> Greyscale with data points <i>D</i>';
     document.getElementById('panel-c-label').innerHTML = on
       ? '<b>(f)</b> Colourised output'
       : '<b>(c)</b> Colourised output';
+    const toggle = document.querySelector('.panel-pipeline-toggle');
+    if (on) {
+      document.querySelector('#canvas-smooth-mask').closest('.panel').appendChild(toggle);
+    } else {
+      document.querySelector('#canvas-a').closest('.panel').appendChild(toggle);
+    }
+
+    if (on) {
+      const beforeH = panelsEl.offsetHeight;
+      panelsEl.classList.add('pipeline-mode');
+
+      // Pin panels at start-of-animation state before browser paints
+      pipelinePanels.forEach(p => {
+        p.style.opacity = '0';
+        p.style.transform = 'translateY(-20px)';
+        p.style.transition = 'none';
+      });
+
+      const delta = panelsEl.offsetHeight - beforeH;
+
+      // Two rAFs: first lets the browser register the initial state,
+      // second starts the transition after the first paint
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        pipelinePanels.forEach(p => {
+          p.style.transition = 'opacity 0.38s ease, transform 0.38s ease';
+          p.style.opacity = '1';
+          p.style.transform = 'translateY(0)';
+        });
+        if (delta > 0) window.scrollBy({ top: delta, behavior: 'smooth' });
+      }));
+
+    } else {
+      // Animate out first
+      pipelinePanels.forEach(p => {
+        p.style.transition = 'opacity 0.28s ease, transform 0.28s ease';
+        p.style.opacity = '0';
+        p.style.transform = 'translateY(-20px)';
+      });
+
+      setTimeout(() => {
+        const beforeH = panelsEl.offsetHeight;
+        pipelinePanels.forEach(p => {
+          p.style.transition = '';
+          p.style.opacity    = '';
+          p.style.transform  = '';
+        });
+        panelsEl.classList.remove('pipeline-mode');
+        const delta = panelsEl.offsetHeight - beforeH; // negative
+        if (delta < 0) window.scrollBy({ top: delta, behavior: 'smooth' });
+      }, 300);
+    }
   });
 });

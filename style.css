@@ -39,17 +39,37 @@ fieldset {
   background: #fdfdfa;
   display: flex;
   flex-direction: column;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.box-title {
+  font-size: 1.1em;
+  font-weight: 700;
+  color: #222;
+  text-align: center;
+  padding: 9px 18px;
+  background: #eeede8;
+  border-bottom: 1px solid #d0d0cc;
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
+}
+
+.box-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 18px 18px;
 }
 
 .algo-box { flex: 2 1 460px; }
-
-/* Algorithm box uses column flow so the shared action row at the bottom
-   stays pinned to the bottom of the super-box. */
-.algo-box {
+.algo-body {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
 }
-.algo-box .mode-panels-wrap { flex: 1 1 auto; }
+.algo-body .mode-panels-wrap { flex: 1 1 auto; }
 .algo-actions {
   margin-top: 14px;
   padding-top: 14px;
@@ -71,38 +91,14 @@ legend {
   color: #444;
 }
 
-legend.box-title {
-  font-size: 1.15em;
-  font-weight: 700;
-  color: #222;
-  letter-spacing: 0.01em;
-  padding: 0 10px;
-}
-
-/* Make the .box top border a complete rectangle, then let the legend "break"
-   it like a standard fieldset: the legend's matching background covers the
-   line behind it, leaving an apparent gap on either side of the title. */
-.box {
-  border: 0;
-  position: relative;
-  padding-top: 14px;
-}
-.box::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 1px solid #bbb;
-  border-radius: 6px;
-  pointer-events: none;
-  z-index: 0;
-}
+/* (box-title is now a div — see .box-title rule above) */
 
 /* Sub-boxes (Sampling, Kernel parameters, Master parameters) */
 .subbox {
   border: 1px solid #cfcfc8;
   border-radius: 5px;
   background: #fff;
-  padding: 10px 14px 14px;
+  padding: 12px 16px 18px;
   margin-top: 12px;
 }
 
@@ -150,37 +146,34 @@ legend.box-title {
 }
 .mode-btn.active:hover { background: #224; }
 
-/* Stack both mode panels in the same grid cell so the algo box height
-   tracks the TALLER panel — switching modes no longer changes height.
-   Both panels are flex-columns that fill the cell and distribute their
-   sub-boxes so the shorter mode doesn't leave a void above the action bar. */
+/* Each slot stacks Manual & Auto variants in the same grid cell so the slot
+   height = max(manual height, auto height). Inactive variant is invisible but
+   keeps its height so both slots stay stable when switching modes. */
 .mode-panels-wrap {
+  display: flex;
+  flex-direction: row;
+  gap: 14px;
+  margin-top: 18px;
+}
+.mode-slot {
+  flex: 1 1 0;
+  min-width: 0;
   display: grid;
   grid-template-columns: 1fr;
 }
-.mode-panels-wrap > .mode-panel {
+.mode-slot > .mode-panel-item {
   grid-row: 1;
   grid-column: 1;
   min-width: 0;
-  display: flex !important;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 14px;
-  height: 100%;
+  margin-top: 0;       /* slot gap handles spacing; suppress .subbox margin-top */
+  align-self: stretch; /* fill the slot height so content can anchor to top */
 }
-.mode-panels-wrap > .mode-panel.hidden {
+.mode-slot > .mode-panel-item.mode-hidden {
   visibility: hidden;
   pointer-events: none;
 }
 
 /* ── Auto mode bits ───────────────────────────────────────── */
-.auto-hint {
-  margin-top: 12px;
-  font-size: 0.84em;
-  color: #555;
-  line-height: 1.5;
-  font-style: italic;
-}
 
 .advanced-toggle {
   display: flex;
@@ -206,7 +199,7 @@ legend.box-title {
 .params-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px 16px;
+  gap: 16px 16px;
   align-items: start;
 }
 .master-params > legend,
@@ -242,81 +235,127 @@ legend.box-title {
 
 .master-row .ctl {
   display: grid;
-  grid-template-columns: 1fr 46px;
+  grid-template-columns: 1fr 62px;
   gap: 6px;
   align-items: center;
 }
 .master-row:not(.slider-master) .ctl {
   grid-template-columns: 1fr;
 }
-/* Kernel-row readouts need a touch more room for values like 0.000001. */
+/* Kernel-row readouts need more room for values like 0.000001. */
 .params-grid .master-row.slider-master .ctl {
-  grid-template-columns: 1fr 70px;
+  grid-template-columns: 1fr 82px;
+}
+
+/* N_fraction percentage wrapper */
+.num-pct-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.num-pct-wrap input { flex: 1; min-width: 0; }
+.pct-sym {
+  font-size: 0.78em;
+  color: #555;
+  font-weight: 600;
+  flex-shrink: 0;
+  width: 14px;
 }
 
 .master-row input[type=number] {
   width: 100%;
-  padding: 5px 6px;
+  height: 26px;
+  padding: 0 6px;
   border: 1px solid #bbb;
   border-radius: 4px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.86em;
+  line-height: 26px;
   text-align: right;
   background: #fff;
+  color: #222;
+  -moz-appearance: textfield;
+  transition: border-color 0.15s;
+}
+.master-row input[type=number]:hover { border-color: #888; }
+.master-row input[type=number]:focus {
+  outline: none;
+  border-color: #336;
+  box-shadow: 0 0 0 2px rgba(51,51,102,0.18);
+}
+.master-row input[type=number]::-webkit-outer-spin-button,
+.master-row input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.master-row input[type=number]:hover::-webkit-inner-spin-button,
+.master-row input[type=number]:focus::-webkit-inner-spin-button {
+  -webkit-appearance: inner-spin-button;
 }
 
 .master-row input[type=range] {
   width: 100%;
   margin: 0;
-  accent-color: #336;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 16px;
 }
 
-/* Shared style for editable numeric readout inputs (master % values and kernel params). */
+/* Track */
+.master-row input[type=range]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #ccc;
+}
+.master-row input[type=range]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #ccc;
+}
+.master-row input[type=range]::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: #336;
+}
+
+/* Thumb — centered on the 4px track: margin-top = (4px − 14px) / 2 = −5px */
+.master-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #336;
+  margin-top: -5px;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.20);
+  transition: background 0.12s;
+}
+.master-row input[type=range]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #336;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.20);
+  transition: background 0.12s;
+}
+
+.master-row input[type=range]:hover::-webkit-slider-thumb { background: #224; }
+.master-row input[type=range]:hover::-moz-range-thumb     { background: #224; }
+
+/* Wider number input for the scale slider */
+.img-scale-ctl {
+  grid-template-columns: 1fr 90px;
+}
+
+/* pct-out and val-out now share the same base style as all other number inputs. */
 .master-row .pct-out,
 .master-row .val-out {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.78em;
-  text-align: right;
-  color: #2a4a7a;
-  background: #eef2f8;
-  border: 1px solid #c8d3e4;
-  border-radius: 4px;
-  padding: 3px 5px;
-  font-weight: 600;
-  width: 100%;
   cursor: text;
-  -moz-appearance: textfield;
-  transition: border-color 0.15s, background 0.15s;
-}
-.master-row .pct-out:hover,
-.master-row .val-out:hover {
-  border-color: #8aaad4;
-  background: #e4ecf7;
-}
-.master-row .pct-out:focus,
-.master-row .val-out:focus {
-  outline: none;
-  border-color: #4a80c8;
-  background: #fff;
-  box-shadow: 0 0 0 2px rgba(74,128,200,0.25);
-}
-/* Hide spinners by default; show on hover/focus so the field stays compact but remains discoverable. */
-.master-row .pct-out::-webkit-outer-spin-button,
-.master-row .pct-out::-webkit-inner-spin-button,
-.master-row .val-out::-webkit-outer-spin-button,
-.master-row .val-out::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-.master-row .pct-out:hover::-webkit-outer-spin-button,
-.master-row .pct-out:focus::-webkit-outer-spin-button,
-.master-row .pct-out:hover::-webkit-inner-spin-button,
-.master-row .pct-out:focus::-webkit-inner-spin-button,
-.master-row .val-out:hover::-webkit-outer-spin-button,
-.master-row .val-out:focus::-webkit-outer-spin-button,
-.master-row .val-out:hover::-webkit-inner-spin-button,
-.master-row .val-out:focus::-webkit-inner-spin-button {
-  -webkit-appearance: inner-spin-button;
+  width: 100%;
 }
 
 .master-row .ctl-select {
@@ -339,24 +378,82 @@ legend.box-title {
 }
 .btn-reset:hover { background: #555; }
 
-.auto-summary {
-  margin-top: 14px;
-  padding: 8px 12px;
+.sampling-box {
+  padding: 12px 16px 18px;
+}
+.sampling-box .method-panels-wrap { margin-top: 16px; }
+.sampling-box .action-row { margin-top: 8px; }
+
+/* Auto sampling + auto/manual params: flex column so footer anchors to bottom.
+   align-items: stretch overrides the align-items: start from .master-params so
+   footer rows (reset, action) expand to full box width. */
+#auto-sampling-fieldset,
+#auto-params-fieldset,
+.subbox.params-grid,
+.subbox.sampling-box {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Auto-mode inner wrapper: 2-column grid for compact slider pairs.
+   No flex-grow here — the stat pill below uses margin-top: auto instead,
+   so it (and the buttons) float to the bottom of the fieldset. */
+.master-params-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 16px;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+}
+.master-params-body > .full-row { grid-column: 1 / -1; }
+
+/* Manual Parameters inner wrapper: 2-column grid */
+.params-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+.params-body > .full-row { grid-column: 1 / -1; }
+
+/* Shared: float the Reset-to-defaults row to the bottom of its box.
+   When preceded by an action-row, margin-top: auto = 0 (space consumed by
+   flex: 1 1 auto sibling above), so only padding-top gives the gap. */
+.box-footer-reset {
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+/* Manual sampling content wrapper — absorbs flex space so footer anchors below */
+.sampling-body {
+  flex: 1 1 auto;
+}
+
+.master-params .action-row { grid-column: 1 / -1; margin-top: 8px; }
+/* Selects inside master-row: suppress default top margin, fill width */
+.master-row select { margin-top: 0; width: 100%; }
+
+/* Inline stat pill inside auto-mode fieldsets (n = … / σ₁ = … · σ₂ = …) */
+.auto-inline-stat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
   background: #eef2f8;
   border: 1px solid #c8d3e4;
-  border-radius: 5px;
+  border-radius: 4px;
+  font-size: 0.8em;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.82em;
-  color: #2a4a7a;
-  display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  align-items: baseline;
-  justify-content: center;
 }
-.auto-summary .k { color: #6a7a95; }
-.auto-summary .v { font-weight: bold; color: #1a2a4a; }
-.auto-summary .sep { color: #aab4c4; padding: 0 4px; }
+.auto-stat-k   { color: #6a7a95; }
+.auto-stat-v   { font-weight: bold; color: #1a2a4a; }
+.auto-stat-sep { color: #aab4c4; padding: 0 3px; }
 
 /* ── Action rows shared by both modes ─────────────────────── */
 .action-row {
@@ -373,12 +470,40 @@ legend.box-title {
 .btn-go {
   width: 100%;
   margin-top: 10px;
-  background: #0a6;
+  background: #2e8b57;
   font-size: 0.95em;
   font-weight: 600;
   padding: 9px 14px;
+  position: relative;
+  overflow: hidden;
 }
-.btn-go:hover { background: #084; }
+.btn-go:hover { background: #1e6b40; }
+.btn-go.loading {
+  background: #1e6b40;
+  cursor: wait;
+}
+
+.btn-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  transition: width 0.12s linear;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255,255,255,0.28) 0px,
+    rgba(255,255,255,0.28) 8px,
+    rgba(255,255,255,0.08) 8px,
+    rgba(255,255,255,0.08) 16px
+  );
+  pointer-events: none;
+}
+
+.btn-progress-text {
+  position: relative;
+  z-index: 1;
+}
 
 .inline-check {
   display: flex;
@@ -467,30 +592,25 @@ select {
 
 .method-panel input[type=number] {
   width: 64px;
-  padding: 3px 5px;
+  padding: 4px 6px;
   border: 1px solid #bbb;
   border-radius: 4px;
-  font-family: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  text-align: right;
+  background: #fff;
+  color: #222;
 }
 
-/* Random-sampling panel: 2-col grid so "n" (points) sits beside the Seed
-   group on the same row, both styled as parameter pills. */
 .random-panel-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 10px 28px;
-  align-items: end;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
-.random-panel-grid .rp-points { grid-column: 1; padding-right: 8px; }
-.random-panel-grid .rp-seed   { grid-column: 2; grid-row: 1; padding-left: 8px; }
-.random-panel-grid > .rp-show { grid-column: 3; grid-row: 1; align-self: end; }
-.random-panel-grid > .master-row.full-row { grid-column: 1 / -1; }
-.random-panel-grid .rp-seed .seed-group { gap: 10px; flex-wrap: wrap; }
 .seed-group {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 4px;
   flex-basis: 100%;
 }
 
@@ -506,12 +626,17 @@ select {
 .seed-opt input[type=radio] { margin: 0; cursor: pointer; accent-color: #336; }
 
 .seed-opt input[type=number] {
-  width: 60px;
-  padding: 3px 5px;
+  width: 62px;
+  height: 26px;
+  padding: 0 6px;
   border: 1px solid #bbb;
   border-radius: 4px;
-  font-family: inherit;
-  font-size: 0.88em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  line-height: 26px;
+  background: #fff;
+  color: #222;
+  text-align: right;
 }
 
 /* When "Random" is chosen, fade the seed input to signal it's inactive. */
@@ -551,11 +676,14 @@ select {
 
 .param-row input[type=number], .slider-row input[type=number] {
   width: 72px;
-  padding: 3px 5px;
+  padding: 4px 6px;
   border: 1px solid #bbb;
   border-radius: 4px;
-  font-family: inherit;
-  font-size: 0.88em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  text-align: right;
+  background: #fff;
+  color: #222;
 }
 
 #img-info {
@@ -597,10 +725,8 @@ select {
 .img-preview-wrap img:not([src]),
 .img-preview-wrap img[src=""] { display: none; }
 
-/* Image super-box uses column flow so the preview can flex. */
-.image-box { display: flex; flex-direction: column; }
-.image-box.box       { /* inherit */ }
-fieldset.box.image-box { display: flex; flex-direction: column; }
+/* Image super-box: box-body is flex column so the preview can stretch. */
+.image-box .box-body { flex: 1 1 auto; }
 
 #img-scale-warn {
   margin-top: 5px;
@@ -667,18 +793,105 @@ input[type=file] { display: none; }
 }
 
 /* ── Panels ── */
-/* Pipeline stage toggle (in auto mode panel) */
-.pipeline-toggle-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 10px;
-  font-size: 0.88em;
-  color: #444;
-  cursor: pointer;
-  user-select: none;
+/* Pipeline stage toggle — inherits pill style from .show-points-toggle */
+.pipeline-toggle-label { margin-top: 10px; }
+/* When placed below panel-a, match width of pts-mode-toggle below panel-b */
+.panel-pipeline-toggle.pipeline-toggle-disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
 }
-.pipeline-toggle-label input[type=checkbox] { accent-color: #336; cursor: pointer; }
+.panel-pipeline-toggle {
+  display: flex;
+  width: 100%;
+  margin-top: 8px;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* Seed group inside compact half-column of auto sampling grid */
+#auto-sampling-fieldset .seed-group-master {
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+#auto-sampling-fieldset .seed-group-master .seed-opt input[type=number] {
+  width: 48px;
+}
+/* Stat pills float to the bottom of the fieldset: margin-top: auto consumes
+   all free space in the flex column (since master-params-body has no flex-grow). */
+#auto-sampling-fieldset .auto-inline-stat,
+#auto-params-fieldset .auto-inline-stat { margin-top: auto; }
+
+.pts-mode-toggle {
+  display: flex;
+  gap: 0;
+  margin-top: 8px;
+  border: 1px solid #bbb;
+  border-radius: 5px;
+  background: #ecece4;
+  width: 100%;
+}
+.pts-mode-btn {
+  position: relative;
+  flex: 1;
+  margin: 0;
+  padding: 6px 4px;
+  background: transparent;
+  color: #555;
+  border-radius: 0;
+  font-size: 0.82em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: none;
+  transition: background 0.12s, color 0.12s;
+}
+.pts-mode-btn:first-child { border-radius: 5px 0 0 5px; }
+.pts-mode-btn:last-child  { border-radius: 0 5px 5px 0; }
+.pts-mode-btn + .pts-mode-btn { border-left: 1px solid #bbb; }
+.pts-mode-btn:hover { background: #e0e0d6; color: #222; }
+.pts-mode-btn.active { background: #336; color: #fff; }
+.pts-mode-btn.active:hover { background: #224; }
+.pts-mode-btn[aria-disabled="true"] { opacity: 0.38; cursor: not-allowed; }
+.pts-mode-btn[aria-disabled="true"]:hover { background: transparent; color: #555; }
+
+/* General tooltip — any element with data-tooltip gets a dark pill above */
+[data-tooltip] { position: relative; }
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a2e;
+  color: #f0f0f0;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 0.76em;
+  font-weight: normal;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s 0.3s;
+  z-index: 200;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+}
+[data-tooltip]::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #1a1a2e;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s 0.3s;
+  z-index: 200;
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:hover::before { opacity: 1; }
+/* Suppress tooltip on disabled pts-mode buttons */
+.pts-mode-btn[aria-disabled="true"]::after,
+.pts-mode-btn[aria-disabled="true"]::before { display: none; }
 
 #panels {
   display: flex;
@@ -688,8 +901,11 @@ input[type=file] { display: none; }
   align-items: flex-start;
 }
 
-/* Pipeline panels hidden until expanded */
-.pipeline-panel { display: none; }
+/* Pipeline panels: removed from layout flow when not in pipeline mode. */
+.pipeline-panel {
+  display: none;
+  pointer-events: none;
+}
 
 /* 2×3 expanded grid */
 #panels.pipeline-mode {
@@ -697,7 +913,12 @@ input[type=file] { display: none; }
   grid-template-columns: repeat(3, 1fr);
   align-items: start;
 }
-#panels.pipeline-mode .pipeline-panel { display: flex; flex-direction: column; }
+#panels.pipeline-mode .pipeline-panel {
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  overflow: visible;
+}
 #panels.pipeline-mode .panel { flex: unset; }
 
 .panel {
@@ -760,37 +981,41 @@ input[type=file] { display: none; }
   image-rendering: crisp-edges;
 }
 
-/* ── Metrics ── */
-#metrics {
+/* ── Panel sub-content (metrics, pipeline toggle) ── */
+.panel-metrics {
   display: flex;
-  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.panel-metric {
+  flex: 1;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 24px 60px;
-  margin-top: 20px;
+  gap: 5px;
+  background: #eef2f8;
+  border: 1px solid #c8d3e4;
+  border-radius: 4px;
+  padding: 5px 6px;
+  font-size: 0.8em;
+  white-space: nowrap;
 }
 
-.metric-card {
-  text-align: center;
-}
-
-.metric-formula {
-  font-size: 1.05em;
-  color: #555;
+.panel-metric-label {
+  color: #6a7a95;
   font-family: Georgia, serif;
-  margin-bottom: 4px;
 }
 
-.metric-value {
-  font-size: 2.2em;
+.panel-metric-value {
   font-weight: bold;
-  color: #222;
-  letter-spacing: 0.02em;
+  color: #1a2a4a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-.metric-desc {
-  font-size: 0.78em;
-  color: #888;
-  margin-top: 3px;
+.panel-metric-hint {
+  color: #999;
+  font-size: 0.84em;
 }
 
 /* ── Results section ── */
@@ -814,8 +1039,8 @@ input[type=file] { display: none; }
   align-items: stretch;
   min-width: 0;
 }
-#results-inner > #results-table-wrap { grid-column: 1; }
-#results-inner > #results-charts     { grid-column: 2 / span 2; }
+#results-inner > #results-table-wrap { grid-column: 1 / span 2; }
+#results-inner > #results-charts     { grid-column: 3; }
 
 #results-table-wrap {
   flex: 1 1 0;
@@ -906,12 +1131,6 @@ input[type=file] { display: none; }
 
 /* Medium: algorithm and panel internals start stacking. */
 @media (max-width: 1024px) {
-  .random-panel-grid {
-    grid-template-columns: 1fr auto;
-  }
-  .random-panel-grid .rp-points { grid-column: 1; grid-row: 1; padding-right: 0; }
-  .random-panel-grid .rp-seed   { grid-column: 1; grid-row: 2; padding-left: 0; }
-  .random-panel-grid > .rp-show { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
   .params-grid { grid-template-columns: 1fr; }
 }
 
@@ -928,6 +1147,12 @@ input[type=file] { display: none; }
     flex-wrap: wrap;
   }
   #panels .panel { flex: 1 1 calc(50% - 16px); min-width: 0; }
+  /* Results: table above charts */
+  #results-inner {
+    grid-template-columns: 1fr;
+  }
+  #results-inner > #results-table-wrap { grid-column: 1; grid-row: 1; }
+  #results-inner > #results-charts     { grid-column: 1; grid-row: 2; }
 }
 
 /* Existing: very narrow — single column everywhere. */
@@ -938,13 +1163,82 @@ input[type=file] { display: none; }
   #results-inner { flex-direction: column; }
   #results-charts { width: 100%; flex-direction: row; flex-wrap: wrap; }
   .chart-wrap { flex: 1 1 240px; }
-  .random-panel-grid {
-    grid-template-columns: 1fr;
-  }
-  .random-panel-grid > .rp-show { grid-column: 1; grid-row: 3; align-self: start; justify-self: start; }
 }
 
-/* ── p > 1 warning modal ──────────────────────────────────────────────────── */
+/* ── Toast notifications ──────────────────────────────────────────────────── */
+#toast-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  max-width: 300px;
+  pointer-events: none;
+}
+
+.toast {
+  background: #1a1a2e;
+  color: #f0f0f0;
+  border-radius: 6px;
+  padding: 10px 38px 10px 14px;
+  font-size: 0.84em;
+  line-height: 1.45;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.32);
+  position: relative;
+  pointer-events: all;
+  overflow: hidden;
+  margin-bottom: 8px;
+  animation: toast-in 0.18s ease;
+  font-family: inherit;
+}
+
+.toast.dismissing {
+  animation: toast-out 0.35s ease forwards;
+  pointer-events: none;
+}
+
+.toast-close {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 1.15em;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 5px;
+  margin: 0;
+  border-radius: 3px;
+}
+.toast-close:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 120px;
+    margin-bottom: 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* ── Slow-run warning modal ───────────────────────────────────────────────── */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -957,47 +1251,6 @@ input[type=file] { display: none; }
 .modal-backdrop.hidden {
   display: none;
 }
-
-#p-modal {
-  position: relative;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.28);
-  padding: 28px 32px 24px;
-  max-width: 420px;
-  width: calc(100% - 48px);
-  font-family: Georgia, serif;
-}
-#p-modal h3 {
-  font-size: 1.05em;
-  margin-bottom: 12px;
-  color: #222;
-}
-#p-modal p {
-  font-size: 0.92em;
-  line-height: 1.55;
-  color: #444;
-  margin-bottom: 10px;
-}
-#p-modal p:last-child { margin-bottom: 0; }
-
-#p-modal-close {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  background: none;
-  border: none;
-  font-size: 1.4em;
-  line-height: 1;
-  color: #888;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin: 0;
-}
-#p-modal-close:hover { background: #f0f0f0; color: #333; }
-
-/* ── Slow-run warning modal ───────────────────────────────────────────────── */
 #slow-modal {
   position: relative;
   background: #fff;

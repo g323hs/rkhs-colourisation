@@ -14,13 +14,14 @@
   <div id="controls">
 
     <!-- ── Image box ──────────────────────────────────────────── -->
-    <fieldset class="box image-box">
-      <legend class="box-title">Image</legend>
+    <div class="box image-box">
+      <div class="box-title">Image</div>
+      <div class="box-body">
       <div class="slider-row">
-        <label for="default-img" style="width:auto;white-space:nowrap;">Select image:</label>
+        <label for="default-img" style="width:auto;white-space:nowrap;font-weight:600;">Select image</label>
         <select id="default-img" style="flex:1;min-width:0;">
-          <option value="images/IMG_6006.jpg" selected>IMG_6006</option>
-          <option value="images/worcester.png">Worcester College, Oxford</option>
+          <option value="images/IMG_6006.jpg">Boat</option>
+          <option value="images/worcester.png" selected>Worcester College, Oxford</option>
           <option value="images/waterfall.png">Waterfall (Escher)</option>
           <option value="images/penrose_tiling.png">Penrose tiling</option>
           <option value="images/penrose_triangle.png">Penrose triangle</option>
@@ -34,21 +35,25 @@
       </div>
       <label class="file-btn file-btn-top" for="img-upload">Upload / Take Photo</label>
       <div class="img-preview-wrap">
-        <img id="image-preview" alt="current image preview">
+        <img id="image-preview" alt="current preview">
       </div>
-      <div class="slider-row">
-        <label for="img-scale" style="width:auto;white-space:nowrap;">Scale</label>
-        <input type="range" id="img-scale" min="0.05" max="1" step="0.05" value="0.25" style="flex:1;min-width:0;">
-        <input type="number" id="img-scale-num" min="0.05" max="1" step="0.05" value="0.25" style="width:4.5em;">
+      <div class="master-row slider-master">
+        <label for="img-scale">Scale</label>
+        <div class="ctl img-scale-ctl">
+          <input type="range" id="img-scale" min="0" max="40" step="1" value="20">
+          <input type="number" id="img-scale-num" class="val-out" min="0.01" max="1" step="any" value="0.25">
+        </div>
       </div>
       <div id="img-info"></div>
       <div id="img-scale-warn" class="hidden"></div>
       <input type="file" id="img-upload" accept="image/*">
-    </fieldset>
+      </div><!-- /.box-body -->
+    </div><!-- /.image-box -->
 
     <!-- ── Algorithm super-box ────────────────────────────────── -->
-    <fieldset class="box algo-box">
-      <legend class="box-title">Algorithm &amp; Parameters</legend>
+    <div class="box algo-box">
+      <div class="box-title">Algorithm &amp; Parameters</div>
+      <div class="box-body algo-body">
 
       <!-- Mode segmented control -->
       <div class="mode-toggle" role="tablist" aria-label="Algorithm mode">
@@ -56,207 +61,250 @@
         <button type="button" class="mode-btn"        data-mode="automatic" role="tab" aria-selected="false">Automatic</button>
       </div>
 
-      <!-- ── MANUAL / AUTOMATIC panels (same-height stack) ──── -->
+      <!-- ── Mode panels: each slot stacks Manual & Auto versions ── -->
+      <!-- Both variants occupy the same grid cell; the taller one sets the height. -->
       <div class="mode-panels-wrap">
 
-      <!-- ── MANUAL MODE ────────────────────────────────────── -->
-      <div id="manual-mode" class="mode-panel">
+        <!-- Slot 1: Point Sampling -->
+        <div class="mode-slot">
 
-        <fieldset class="subbox sampling-box">
-          <legend>POINT SAMPLING</legend>
-          <div class="slider-row">
-            <label for="point-method" style="width:auto;white-space:nowrap;">Select method:</label>
-            <select id="point-method" style="flex:1;min-width:0;">
-              <option value="grid">Regular grid</option>
-              <option value="random" selected>Random</option>
-              <option value="user">User-selected</option>
-            </select>
-          </div>
+          <!-- Manual: Point Sampling -->
+          <fieldset class="subbox sampling-box mode-panel-item" data-for-mode="manual">
+            <legend>POINT SAMPLING</legend>
+            <div class="sampling-body">
+              <div class="master-row">
+                <label for="point-method">Select method</label>
+                <select id="point-method">
+                  <option value="grid">Regular grid</option>
+                  <option value="random" selected>Random</option>
+                  <option value="user">User-selected</option>
+                </select>
+              </div>
 
-          <div class="method-panels-wrap">
-            <div id="grid-panel" class="method-panel invis">
-              <label>Width <input type="number" id="grid-w" value="5" min="1" max="30"></label>
-              <label>Height <input type="number" id="grid-h" value="5" min="1" max="30"></label>
-            </div>
+              <div class="method-panels-wrap">
+                <div id="grid-panel" class="method-panel invis">
+                  <label>Width <input type="number" id="grid-w" value="5" min="1" max="30"></label>
+                  <label>Height <input type="number" id="grid-h" value="5" min="1" max="30"></label>
+                </div>
 
-            <div id="random-panel" class="method-panel random-panel-grid">
-              <div class="master-row slider-master rp-points">
-                <label for="n-random">n <span class="hint">sample points</span></label>
-                <div class="ctl">
-                  <input type="range"  id="n-random-slider" min="10" max="500" step="10" value="200">
-                  <input type="number" id="n-random" class="val-out" min="1" max="500" step="10" value="200">
+                <div id="random-panel" class="method-panel random-panel-grid">
+                  <div class="master-row slider-master rp-points">
+                    <label for="n-random">n <span class="hint">sample points</span></label>
+                    <div class="ctl">
+                      <input type="range"  id="n-random-slider" min="10" max="500" step="10" value="200">
+                      <input type="number" id="n-random" class="val-out" min="1" max="500" step="10" value="200">
+                    </div>
+                  </div>
+                  <div class="master-row rp-seed">
+                    <label for="seed-fixed">Seed</label>
+                    <div class="seed-group" role="radiogroup" aria-label="Seed mode">
+                      <label class="seed-opt">
+                        <input type="radio" name="seed-mode" value="random" id="seed-random">
+                        <span>Random</span>
+                      </label>
+                      <label class="seed-opt">
+                        <input type="radio" name="seed-mode" value="seed" id="seed-fixed" checked>
+                        <span>Seed</span>
+                        <input type="number" id="seed" value="42" min="0">
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="user-panel" class="method-panel invis">
+                  <button id="tool-pick" class="tool-btn active" data-tooltip="Click the image to add a sample point">Pick</button>
+                  <button id="tool-remove" class="tool-btn" data-tooltip="Click a point to remove it">Remove</button>
                 </div>
               </div>
-              <div class="master-row rp-seed">
-                <label for="seed-fixed">Seed</label>
-                <div class="seed-group" role="radiogroup" aria-label="Seed mode">
+            </div><!-- /.sampling-body -->
+            <div class="action-row">
+              <button class="btn-primary gen-pts-btn" data-tooltip="Place sample points using the current method">Generate points</button>
+              <button class="btn-danger clear-pts-btn" data-tooltip="Remove all sample points">Clear</button>
+            </div>
+            <div class="master-row full-row master-reset-row box-footer-reset">
+              <button type="button" id="reset-manual-sampling" class="btn-reset" data-tooltip="Restore method, n, and seed to defaults">Reset to defaults</button>
+            </div>
+          </fieldset>
+
+          <!-- Auto: Point Sampling -->
+          <fieldset class="subbox master-params mode-panel-item mode-hidden" id="auto-sampling-fieldset" data-for-mode="automatic">
+            <legend>Point Sampling</legend>
+
+            <div class="master-params-body">
+              <div class="master-row slider-master">
+                <label for="m-nfrac">N<sub>fraction</sub> <span class="hint">pixels sampled</span></label>
+                <div class="ctl">
+                  <input type="range" id="m-nfrac" min="0.1" max="10" step="0.1" value="1">
+                  <div class="num-pct-wrap">
+                    <input type="number" id="m-nfrac-out" class="pct-out" min="0.1" max="10" step="0.1" value="1">
+                    <span class="pct-sym" aria-hidden="true">%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="master-row slider-master">
+                <label for="m-fillfrac">Fill<sub>fraction</sub> <span class="hint">spatial-fill share</span></label>
+                <div class="ctl">
+                  <input type="range" id="m-fillfrac" min="0" max="20" step="0.5" value="2">
+                  <div class="num-pct-wrap">
+                    <input type="number" id="m-fillfrac-out" class="pct-out" min="0" max="20" step="0.5" value="2">
+                    <span class="pct-sym" aria-hidden="true">%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="master-row slider-master">
+                <label for="m-density-slider">&#958; <span class="hint">edge / smooth density ratio</span></label>
+                <div class="ctl">
+                  <input type="range" id="m-density-slider" min="0" max="8" step="1" value="4">
+                  <input type="number" id="m-density" value="3" min="0.01" step="any" class="val-out">
+                </div>
+              </div>
+
+              <div class="master-row master-seed-row">
+                <label for="m-seed-fixed">Seed <span class="hint">point sampling</span></label>
+                <div class="seed-group seed-group-master" role="radiogroup" aria-label="Auto-mode seed">
                   <label class="seed-opt">
-                    <input type="radio" name="seed-mode" value="random" id="seed-random">
+                    <input type="radio" name="m-seed-mode" value="random" id="m-seed-random">
                     <span>Random</span>
                   </label>
                   <label class="seed-opt">
-                    <input type="radio" name="seed-mode" value="seed" id="seed-fixed" checked>
+                    <input type="radio" name="m-seed-mode" value="seed" id="m-seed-fixed" checked>
                     <span>Seed</span>
-                    <input type="number" id="seed" value="42" min="0">
+                    <input type="number" id="m-seed" value="42" min="0">
                   </label>
                 </div>
               </div>
-              <label class="show-points-toggle rp-show"><input type="checkbox" id="show-points" checked> Show points</label>
+            </div><!-- /.master-params-body -->
+
+            <div class="auto-inline-stat">
+              <span class="auto-stat-k">n =</span>
+              <span class="auto-stat-v" id="auto-n">—</span>
             </div>
 
-            <div id="user-panel" class="method-panel invis">
-              <button id="tool-pick" class="tool-btn active">Pick</button>
-              <button id="tool-remove" class="tool-btn">Remove</button>
+            <div class="action-row">
+              <button class="btn-primary gen-pts-btn" data-tooltip="Place sample points using the current method">Generate points</button>
+              <button class="btn-danger clear-pts-btn" data-tooltip="Remove all sample points">Clear</button>
             </div>
-          </div>
-        </fieldset>
-
-        <fieldset class="subbox params-grid">
-          <legend>Kernel parameters</legend>
-
-          <div class="master-row full-row">
-            <label for="kernel-type">Kernel</label>
-            <div class="ctl">
-              <select id="kernel-type" class="ctl-select">
-                <option value="gaussian">Gaussian</option>
-                <option value="wendland">Wendland C2</option>
-              </select>
+            <div class="master-row full-row master-reset-row box-footer-reset">
+              <button type="button" id="reset-auto-sampling" class="btn-reset" data-tooltip="Restore point sampling parameters to defaults">Reset to defaults</button>
             </div>
-          </div>
+          </fieldset>
 
-          <div class="master-row slider-master">
-            <label for="sigma1">&#963;&#8321; <span class="hint">spatial bandwidth</span></label>
-            <div class="ctl">
-              <input type="range"  id="sigma1"     min="-3" max="2.25" step="0.25" value="-1">
-              <input type="number" id="sigma1-num" min="0.001" max="200" step="any" value="0.1" class="val-out">
+        </div><!-- /.mode-slot (sampling) -->
+
+        <!-- Slot 2: Parameters -->
+        <div class="mode-slot">
+
+          <!-- Manual: Parameters -->
+          <fieldset class="subbox params-grid mode-panel-item" data-for-mode="manual">
+            <legend>Parameters</legend>
+
+            <div class="params-body">
+              <div class="master-row full-row">
+                <label for="kernel-type">Select Kernel</label>
+                <select id="kernel-type">
+                  <option value="gaussian">Gaussian</option>
+                  <option value="wendland">Wendland C2</option>
+                </select>
+              </div>
+
+              <div class="master-row slider-master">
+                <label for="sigma1">&#963;&#8321; <span class="hint">spatial bandwidth</span></label>
+                <div class="ctl">
+                  <input type="range"  id="sigma1"     min="-3" max="2.25" step="0.25" value="-1">
+                  <input type="number" id="sigma1-num" min="0.001" max="200" step="any" value="0.1" class="val-out">
+                </div>
+              </div>
+
+              <div class="master-row slider-master">
+                <label for="sigma2">&#963;&#8322; <span class="hint">intensity bandwidth</span></label>
+                <div class="ctl">
+                  <input type="range"  id="sigma2"     min="-3" max="2.25" step="0.25" value="0">
+                  <input type="number" id="sigma2-num" min="0.001" max="200" step="any" value="1" class="val-out">
+                </div>
+              </div>
+
+              <div class="master-row slider-master">
+                <label for="p-param">p <span class="hint">intensity exponent</span></label>
+                <div class="ctl">
+                  <input type="range"  id="p-param" min="0" max="20" step="1" value="10">
+                  <input type="number" id="p-num"   min="0.1" max="2" step="any" value="1" class="val-out">
+                </div>
+              </div>
+
+              <div class="master-row slider-master">
+                <label for="delta">&#948; <span class="hint">regularisation parameter</span></label>
+                <div class="ctl">
+                  <input type="range"  id="delta"     min="-8" max="1" step="1" value="-1">
+                  <input type="number" id="delta-num" min="1e-8" max="10" step="any" value="0.1" class="val-out">
+                </div>
+              </div>
+            </div><!-- /.params-body -->
+
+            <div class="master-row full-row master-reset-row box-footer-reset">
+              <button type="button" id="reset-kernel" class="btn-reset" data-tooltip="Restore kernel and bandwidth parameters to defaults">Reset to defaults</button>
             </div>
-          </div>
+          </fieldset>
 
-          <div class="master-row slider-master">
-            <label for="sigma2">&#963;&#8322; <span class="hint">intensity bandwidth</span></label>
-            <div class="ctl">
-              <input type="range"  id="sigma2"     min="-3" max="2.25" step="0.25" value="0">
-              <input type="number" id="sigma2-num" min="0.001" max="200" step="any" value="1" class="val-out">
+          <!-- Auto: Parameters -->
+          <fieldset class="subbox master-params mode-panel-item mode-hidden" id="auto-params-fieldset" data-for-mode="automatic">
+            <legend>Parameters</legend>
+
+            <div class="master-params-body">
+              <div class="master-row slider-master full-row">
+                <label for="m-beta1">&#946;&#8321; <span class="hint">&#963;&#8321; coverage</span></label>
+                <div class="ctl">
+                  <input type="range" id="m-beta1" min="1" max="99" step="1" value="95">
+                  <div class="num-pct-wrap">
+                    <input type="number" id="m-beta1-out" class="pct-out" min="1" max="99" step="1" value="95">
+                    <span class="pct-sym" aria-hidden="true">%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="master-row slider-master full-row">
+                <label for="m-beta2">&#946;&#8322; <span class="hint">&#963;&#8322; coverage</span></label>
+                <div class="ctl">
+                  <input type="range" id="m-beta2" min="1" max="99" step="1" value="95">
+                  <div class="num-pct-wrap">
+                    <input type="number" id="m-beta2-out" class="pct-out" min="1" max="99" step="1" value="95">
+                    <span class="pct-sym" aria-hidden="true">%</span>
+                  </div>
+                </div>
+              </div>
+            </div><!-- /.master-params-body -->
+
+            <div class="auto-inline-stat">
+              <span class="auto-stat-k">&#963;&#8321; =</span>
+              <span class="auto-stat-v" id="auto-s1">—</span>
+              <span class="auto-stat-sep">·</span>
+              <span class="auto-stat-k">&#963;&#8322; =</span>
+              <span class="auto-stat-v" id="auto-s2">—</span>
             </div>
-          </div>
 
-          <div class="master-row slider-master">
-            <label for="p-param">p <span class="hint">intensity exponent</span></label>
-            <div class="ctl">
-              <input type="range"  id="p-param" min="0.1" max="3" step="0.1" value="1">
-              <input type="number" id="p-num"   min="0.1" max="3" step="0.1" value="1" class="val-out">
+            <div class="action-row">
+              <button type="button" id="calc-auto-params-btn" class="btn-primary" data-tooltip="Compute σ₁ and σ₂ from the current sample points and β parameters">Calculate parameters</button>
             </div>
-          </div>
 
-          <div class="master-row slider-master">
-            <label for="delta">&#948; <span class="hint">regularisation parameter</span></label>
-            <div class="ctl">
-              <input type="range"  id="delta"     min="-8" max="1" step="1" value="-1">
-              <input type="number" id="delta-num" min="1e-8" max="10" step="any" value="0.1" class="val-out">
+            <div class="master-row full-row master-reset-row box-footer-reset">
+              <button type="button" id="reset-auto-params" class="btn-reset" data-tooltip="Restore β₁ and β₂ to defaults">Reset to defaults</button>
             </div>
-          </div>
-        </fieldset>
-      </div>
+          </fieldset>
 
-      <!-- ── AUTOMATIC MODE ─────────────────────────────────── -->
-      <div id="auto-mode" class="mode-panel hidden">
-
-        <p class="auto-hint">
-          Points and parameters are chosen automatically from the master
-          parameters below.
-        </p>
-
-        <fieldset class="subbox master-params" id="master-fieldset">
-          <legend>Master parameters</legend>
-
-          <div class="master-row slider-master">
-            <label for="m-beta1">&#946;&#8321; <span class="hint">&#963;&#8321; coverage</span></label>
-            <div class="ctl">
-              <input type="range" id="m-beta1" min="1" max="99" step="1" value="95">
-              <input type="number" id="m-beta1-out" class="pct-out" min="1" max="99" step="1" value="95">
-            </div>
-          </div>
-
-          <div class="master-row slider-master">
-            <label for="m-beta2">&#946;&#8322; <span class="hint">&#963;&#8322; coverage</span></label>
-            <div class="ctl">
-              <input type="range" id="m-beta2" min="1" max="99" step="1" value="95">
-              <input type="number" id="m-beta2-out" class="pct-out" min="1" max="99" step="1" value="95">
-            </div>
-          </div>
-
-          <div class="master-row slider-master">
-            <label for="m-nfrac">N<sub>fraction</sub> <span class="hint">pixels sampled</span></label>
-            <div class="ctl">
-              <input type="range" id="m-nfrac" min="0.1" max="10" step="0.1" value="1">
-              <input type="number" id="m-nfrac-out" class="pct-out" min="0.1" max="10" step="0.1" value="1">
-            </div>
-          </div>
-
-          <div class="master-row slider-master">
-            <label for="m-fillfrac">Fill<sub>fraction</sub> <span class="hint">spatial-fill share</span></label>
-            <div class="ctl">
-              <input type="range" id="m-fillfrac" min="0" max="20" step="0.5" value="2">
-              <input type="number" id="m-fillfrac-out" class="pct-out" min="0" max="20" step="0.5" value="2">
-            </div>
-          </div>
-
-          <div class="master-row slider-master">
-            <label for="m-density-slider">&#958; <span class="hint">edge / smooth density ratio</span></label>
-            <div class="ctl">
-              <input type="range" id="m-density-slider" min="1" max="20" step="0.1" value="3">
-              <input type="number" id="m-density" value="3.0" min="1" max="20" step="0.1" class="val-out">
-            </div>
-          </div>
-
-          <div class="master-row master-seed-row">
-            <label for="m-seed-fixed">Seed <span class="hint">point sampling</span></label>
-            <div class="seed-group seed-group-master" role="radiogroup" aria-label="Auto-mode seed">
-              <label class="seed-opt">
-                <input type="radio" name="m-seed-mode" value="random" id="m-seed-random">
-                <span>Random</span>
-              </label>
-              <label class="seed-opt">
-                <input type="radio" name="m-seed-mode" value="seed" id="m-seed-fixed" checked>
-                <span>Seed</span>
-                <input type="number" id="m-seed" value="42" min="0">
-              </label>
-            </div>
-          </div>
-
-          <div class="master-row full-row master-reset-row">
-            <button type="button" id="reset-master" class="btn-reset">Reset to defaults</button>
-          </div>
-        </fieldset>
-
-        <div class="auto-summary" id="auto-summary">
-          <span class="k">n =</span> <span class="v" id="auto-n">—</span>
-          <span class="sep">·</span>
-          <span class="k">&#963;&#8321; ≈</span> <span class="v" id="auto-s1">—</span>
-          <span class="sep">·</span>
-          <span class="k">&#963;&#8322; ≈</span> <span class="v" id="auto-s2">—</span>
-        </div>
-
-        <label class="pipeline-toggle-label">
-          <input type="checkbox" id="show-pipeline">
-          Show pipeline stages
-        </label>
-      </div>
+        </div><!-- /.mode-slot (params) -->
 
       </div><!-- /.mode-panels-wrap -->
 
       <!-- Shared action buttons pinned to the bottom of the Algorithm box -->
       <div class="algo-actions">
         <p class="algo-blurb"><b>RKHS colourisation</b> reconstructs the full colour image from a small set of known sample points using kernel interpolation.</p>
-        <div class="action-row">
-          <button id="gen-pts-btn"   class="btn-primary">Generate points</button>
-          <button id="clear-pts-btn" class="btn-danger">Clear</button>
-        </div>
-        <button id="colourise-btn" class="btn-go">Colourise</button>
+        <button id="colourise-btn" class="btn-go" data-tooltip="Reconstruct the full colour image from sample points using RKHS">Colourise</button>
       </div>
 
       <p id="status"></p>
-    </fieldset>
+      </div><!-- /.box-body.algo-body -->
+    </div><!-- /.algo-box -->
 
   </div>
 
@@ -264,6 +312,10 @@
     <div class="panel">
       <div class="panel-label" id="panel-a-label"><b>(a)</b> Scaled image</div>
       <div class="img-box"><canvas id="canvas-a"></canvas></div>
+      <label class="show-points-toggle pipeline-toggle-label panel-pipeline-toggle" data-tooltip="Reveal edge detection and sample placement panels">
+        <input type="checkbox" id="show-pipeline">
+        Show pipeline stages
+      </label>
     </div>
     <div class="panel pipeline-panel">
       <div class="panel-label"><b>(b)</b> Greyscale</div>
@@ -280,30 +332,34 @@
     <div class="panel">
       <div class="panel-label" id="panel-b-label"><b>(b)</b> Greyscale with data points <i>D</i></div>
       <div class="img-box"><div id="canvas-b-wrap"><canvas id="canvas-b-dots"></canvas></div></div>
+      <div class="pts-mode-toggle" role="radiogroup" aria-label="Points display mode">
+        <button type="button" class="pts-mode-btn active" data-pts-mode="points" data-tooltip="Coloured dots overlaid on the greyscale image">Points</button>
+        <button type="button" class="pts-mode-btn" data-pts-mode="coloured" data-tooltip="Sample pixels replaced with their true colour">Colour</button>
+        <button type="button" class="pts-mode-btn" data-pts-mode="greyscale" data-tooltip="Plain greyscale with no sample overlay">Greyscale</button>
+      </div>
     </div>
     <div class="panel">
       <div class="panel-label" id="panel-c-label"><b>(c)</b> Colourised output</div>
       <div class="img-box"><canvas id="canvas-c"></canvas></div>
-    </div>
-  </div>
-
-  <div id="metrics">
-    <div class="metric-card">
-      <div class="metric-formula">Frobenius norm</div>
-      <div class="metric-value" id="metric-frob">—</div>
-      <div class="metric-desc">smaller is better</div>
-    </div>
-    <div class="metric-card">
-      <div class="metric-formula">SSIM index</div>
-      <div class="metric-value" id="metric-ssim">—</div>
-      <div class="metric-desc">closer to 1 is better</div>
+      <div class="panel-metrics">
+        <div class="panel-metric">
+          <span class="panel-metric-label">&#8214;&#183;&#8214;<sub>F</sub></span>
+          <span class="panel-metric-value" id="metric-frob">—</span>
+          <span class="panel-metric-hint">smaller is better</span>
+        </div>
+        <div class="panel-metric">
+          <span class="panel-metric-label">SSIM</span>
+          <span class="panel-metric-value" id="metric-ssim">—</span>
+          <span class="panel-metric-hint">closer to 1</span>
+        </div>
+      </div>
     </div>
   </div>
 
   <div id="results-section">
     <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px;">
       <h2 id="results-heading" style="margin-bottom:0;">Results</h2>
-      <button id="clear-results-btn" style="background:#933;margin-top:0;padding:4px 10px;font-size:0.82em;">Clear</button>
+      <button id="clear-results-btn" style="background:#933;margin-top:0;padding:4px 10px;font-size:0.82em;" data-tooltip="Delete all saved results">Clear</button>
     </div>
     <div id="results-inner">
       <div id="results-table-wrap">
@@ -347,19 +403,7 @@
   </div>
 </div>
 
-<!-- ── p > 1 warning modal ─────────────────────────────────────────────── -->
-<div id="p-modal-backdrop" class="modal-backdrop hidden" aria-hidden="true">
-  <div id="p-modal" role="alertdialog" aria-modal="true" aria-labelledby="p-modal-title">
-    <button id="p-modal-close" aria-label="Close">&times;</button>
-    <h3 id="p-modal-title">Note on the exponent <i>p</i></h3>
-    <p>
-      In practice, <i>p</i> should be bounded above by&nbsp;<b>1</b> — values
-      above&nbsp;1 compress the intensity kernel and can degrade the
-      colourisation quality.
-    </p>
-    <p>You are free to experiment with higher values, but results may be unexpected.</p>
-  </div>
-</div>
+<div id="toast-container"></div>
 
 <script src="colourise.js"></script>
 <script src="sketch.js"></script>
